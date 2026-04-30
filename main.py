@@ -1,19 +1,5 @@
-# =========================
-# 1. Setup + Download Data
-# =========================
-import kagglehub
 import os
-
-path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
-data_dir = os.path.join(path, "Dataset_BUSI_with_GT")
-
-print("Dataset path:", data_dir)
-print("Classes:", os.listdir(data_dir))
-
-
-# =========================
-# 2. Imports
-# =========================
+import kagglehub
 import cv2
 import torch
 import numpy as np
@@ -21,10 +7,10 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch.nn as nn
 
+path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
+data_dir = os.path.join(path, "Dataset_BUSI_with_GT")
 
-# =========================
 # 3. Dataset Class
-# =========================
 class BUSIDataset(Dataset):
     def __init__(self, root_dir):
         self.image_paths = []
@@ -63,9 +49,7 @@ class BUSIDataset(Dataset):
         return img, mask
 
 
-# =========================
 # 4. Load Dataset
-# =========================
 dataset = BUSIDataset(data_dir)
 
 train_size = int(0.8 * len(dataset))
@@ -79,9 +63,7 @@ test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 print("Dataset size:", len(dataset))
 
 
-# =========================
 # 5. U-Net Model
-# =========================
 class UNet(nn.Module):
     def __init__(self):
         super().__init__()
@@ -102,7 +84,10 @@ class UNet(nn.Module):
 
         self.pool = nn.MaxPool2d(2)
 
-        self.bottleneck = C(256, 512)
+        self.bottleneck = nn.Sequential(
+            C(256, 512),
+            nn.Dropout2d(0.3)
+        )
 
         self.up3 = nn.ConvTranspose2d(512, 256, 2, stride=2)
         self.dec3 = C(512, 256)
@@ -134,19 +119,17 @@ class UNet(nn.Module):
         return torch.sigmoid(self.final(d1))
 
 
-# =========================
 # 6. Training Setup
-# =========================
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = UNet().to(device)
 
 MODEL_PATH = "unet_model.pth"
 if os.path.exists(MODEL_PATH):
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-    print("✅ Loaded saved model!")
+    print("Loaded saved model!")
     train_model = False   # change to True if you want to keep training
 else:
-    print("🚀 No saved model found. Training from scratch...")
+    print("No saved model found. Training from scratch...")
     train_model = True
 
 def bce_dice_loss(pred, target, smooth=1):
@@ -163,18 +146,14 @@ criterion = bce_dice_loss
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 
-# =========================
 # 7. Dice Score
-# =========================
 def dice_score(pred, target, smooth=1):
     pred = (pred > 0.65).float()
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
 
 
-# =========================
 # 8. Training Loop
-# =========================
 epochs = 10
 if train_model:
     for epoch in range(epochs):
@@ -198,9 +177,7 @@ if train_model:
     print("Model saved!")
 
 
-# =========================
 # 9. Evaluation
-# =========================
 model.eval()
 dice_total = 0
 
@@ -214,9 +191,7 @@ with torch.no_grad():
 print("Average Dice Score:", dice_total / len(test_loader))
 
 
-# =========================
 # 10. Visualization
-# =========================
 model.eval()
 
 imgs, masks = next(iter(test_loader))
@@ -230,7 +205,7 @@ imgs = imgs.cpu()
 masks = masks.cpu()
 preds = preds.cpu()
 
-for i in range(10):
+for i in range(len(imgs)):
     plt.figure(figsize=(10,3))
 
     plt.subplot(1,3,1)
