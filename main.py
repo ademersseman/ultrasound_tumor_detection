@@ -10,7 +10,7 @@ import torch.nn as nn
 path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
 data_dir = os.path.join(path, "Dataset_BUSI_with_GT")
 
-# 3. Dataset Class
+# Dataset Classification
 class BUSIDataset(Dataset):
     def __init__(self, root_dir):
         self.image_paths = []
@@ -49,7 +49,7 @@ class BUSIDataset(Dataset):
         return img, mask
 
 
-# 4. Load Dataset
+# Load Dataset
 dataset = BUSIDataset(data_dir)
 
 train_size = int(0.8 * len(dataset))
@@ -63,7 +63,7 @@ test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 print("Dataset size:", len(dataset))
 
 
-# 5. U-Net Model
+# U-Net Model
 class UNet(nn.Module):
     def __init__(self):
         super().__init__()
@@ -119,7 +119,7 @@ class UNet(nn.Module):
         return torch.sigmoid(self.final(d1))
 
 
-# 6. Training Setup
+# Training Setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = UNet().to(device)
 
@@ -127,7 +127,7 @@ MODEL_PATH = "unet_model.pth"
 if os.path.exists(MODEL_PATH):
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
     print("Loaded saved model!")
-    train_model = False   # change to True if you want to keep training
+    train_model = False
 else:
     print("No saved model found. Training from scratch...")
     train_model = True
@@ -142,7 +142,6 @@ def bce_dice_loss(pred, target, smooth=1):
     
     return bce + dice
 
-criterion = bce_dice_loss
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 
@@ -164,7 +163,7 @@ if train_model:
             imgs, masks = imgs.to(device), masks.to(device)
 
             preds = model(imgs)
-            loss = criterion(preds, masks)
+            loss = bce_dice_loss(preds, masks)
 
             optimizer.zero_grad()
             loss.backward()
@@ -177,7 +176,7 @@ if train_model:
     print("Model saved!")
 
 
-# 9. Evaluation
+# Evaluation
 model.eval()
 dice_total = 0
 
@@ -191,7 +190,7 @@ with torch.no_grad():
 print("Average Dice Score:", dice_total / len(test_loader))
 
 
-# 10. Visualization
+# Visualization
 model.eval()
 
 imgs, masks = next(iter(test_loader))
