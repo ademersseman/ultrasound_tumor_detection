@@ -149,7 +149,6 @@ class UNet(nn.Module):
             raise RuntimeError("Shape mismatch in skip connection (d1, e1)")
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
-        # return torch.sigmoid(self.final(d1))
         return self.final(d1)
 
 
@@ -160,12 +159,15 @@ def bce_dice_loss(pred, target, smooth=1):
     if pred.numel() == 0:
         raise ValueError("Empty tensors passed to loss")
 
-    if not torch.isfinite(pred).all() or not torch.isfinite(target).all():
-        raise ValueError("Non-finite values in inputs")
-
+def bce_dice_loss(pred, target, smooth=1):
+    # BCE part
     bce = nn.BCEWithLogitsLoss()(pred, target)
-    intersection = (pred * target).sum()
-    dice = 1 - (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
+    
+    # Apply sigmoid here for dice since we need probabilities
+    pred_prob = torch.sigmoid(pred)
+    intersection = (pred_prob * target).sum()
+    dice = 1 - (2 * intersection + smooth) / (pred_prob.sum() + target.sum() + smooth)
+    
     return bce + dice
 
 
@@ -176,11 +178,9 @@ def dice_score(pred, target, smooth=1, threshold = 0.65):
     if pred.numel() == 0:
         raise ValueError("Empty tensors")
 
-    if not torch.isfinite(pred).all() or not torch.isfinite(target).all():
-        raise ValueError("Non-finite values")
-    
-    pred = torch.sigmoid(pred)
-    pred = (pred > threshold).float()
+# 7. Dice Score
+def dice_score(pred, target, smooth=1):
+    pred = (torch.sigmoid(pred) > 0.65).float()  # add sigmoid
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
 
