@@ -70,7 +70,7 @@ class BUSIDataset(Dataset):
             )
         
         img = cv2.resize(img, (256, 256))
-        mask = cv2.resize(img, (256, 256))
+        mask = cv2.resize(mask, (256, 256), interpolation=cv2.INTER_NEAREST)
 
         img = img / 255.0
         mask = mask / 255.0
@@ -126,7 +126,7 @@ class UNet(nn.Module):
 
         h, w = x.shape[2], x.shape[3]
         if h % 8 != 0 or w % 8 != 0:
-            raise ValueError("Height and width must be divisible by 8")
+            raise RuntimeError("Height and width must be divisible by 8")
 
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool(e1))
@@ -149,6 +149,7 @@ class UNet(nn.Module):
             raise RuntimeError("Shape mismatch in skip connection (d1, e1)")
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
+        # return torch.sigmoid(self.final(d1))
         return self.final(d1)
 
 
@@ -160,8 +161,6 @@ def bce_dice_loss(pred, target, smooth=1):
         raise ValueError("Empty tensors passed to loss")
 
     bce = nn.BCEWithLogitsLoss()(pred, target)
-    
-    # Apply sigmoid here for dice since we need probabilities
     pred_prob = torch.sigmoid(pred)
     intersection = (pred_prob * target).sum()
     dice = 1 - (2 * intersection + smooth) / (pred_prob.sum() + target.sum() + smooth)
@@ -177,8 +176,10 @@ def dice_score(pred, target, smooth=1, threshold = 0.65):
         raise ValueError("Empty tensors")
 
     pred = (torch.sigmoid(pred) > threshold).float()  # add sigmoid
+    target = (target > threshold).float()
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
+
 
 def visualize_predictions(imgs, masks, preds, threshold=0.65):
     for i in range(len(imgs)):
@@ -198,8 +199,9 @@ def visualize_predictions(imgs, masks, preds, threshold=0.65):
 
         plt.show()
 
-
 def main():
+    EPOCHS = 10
+
     path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
     data_dir = os.path.join(path, "Dataset_BUSI_with_GT")
 
@@ -229,9 +231,8 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-    epochs = 10
     if train_model:
-        for epoch in range(epochs):
+        for epoch in range(EPOCHS):
             model.train()
             total_loss = 0
 
