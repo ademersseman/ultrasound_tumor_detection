@@ -137,17 +137,36 @@ class UNet(nn.Module):
 
 
 def bce_dice_loss(pred, target, smooth=1):
+    if pred.shape != target.shape:
+        raise ValueError(f"Shape mismatch: {pred.shape} vs {target.shape}")
+
+    if pred.numel() == 0:
+        raise ValueError("Empty tensors passed to loss")
+
+    if not torch.isfinite(pred).all() or not torch.isfinite(target).all():
+        raise ValueError("Non-finite values in inputs")
+
+    pred = torch.clamp(pred, 1e-7, 1 - 1e-7)
+
     bce = nn.BCELoss()(pred, target)
     intersection = (pred * target).sum()
     dice = 1 - (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
     return bce + dice
 
 
-def dice_score(pred, target, smooth=1):
-    pred = (pred > 0.65).float()
+def dice_score(pred, target, smooth=1, threshold = 0.65):
+    if pred.shape != target.shape:
+        raise ValueError(f"Shape mismatch: {pred.shape} vs {target.shape}")
+
+    if pred.numel() == 0:
+        raise ValueError("Empty tensors")
+
+    if not torch.isfinite(pred).all() or not torch.isfinite(target).all():
+        raise ValueError("Non-finite values")
+    
+    pred = (pred > threshold).float()
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
-
 
 def main():
     path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
