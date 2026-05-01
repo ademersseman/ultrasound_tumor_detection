@@ -188,35 +188,3 @@ with torch.no_grad():
         dice_total += dice_score(preds, masks).item()
 
 print("Average Dice Score:", dice_total / len(test_loader))
-
-
-# Visualization
-model.eval()
-
-imgs, masks = next(iter(test_loader))
-imgs = imgs.to(device)
-
-with torch.no_grad():
-    preds = model(imgs)
-
-# Move to CPU for plotting
-imgs = imgs.cpu()
-masks = masks.cpu()
-preds = preds.cpu()
-
-for i in range(len(imgs)):
-    plt.figure(figsize=(10,3))
-
-    plt.subplot(1,3,1)
-    plt.title("Image")
-    plt.imshow(imgs[i].squeeze(), cmap='gray')
-
-    plt.subplot(1,3,2)
-    plt.title("Ground Truth")
-    plt.imshow(masks[i].squeeze(), cmap='gray')
-
-    plt.subplot(1,3,3)
-    plt.title("Prediction")
-    plt.imshow((preds[i].squeeze() > 0.65), cmap='gray')
-
-    plt.show()
