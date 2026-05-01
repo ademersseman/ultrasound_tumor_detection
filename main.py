@@ -118,6 +118,16 @@ class UNet(nn.Module):
         self.final = nn.Conv2d(64, 1, 1)
 
     def forward(self, x):
+        if x.ndim != 4:
+            raise ValueError(f"Expected 4D input (B,C,H,W), got {x.shape}")
+
+        if x.shape[1] != 1:
+            raise ValueError(f"Expected 1 input channel, got {x.shape[1]}")
+
+        h, w = x.shape[2], x.shape[3]
+        if h % 8 != 0 or w % 8 != 0:
+            raise ValueError("Height and width must be divisible by 8")
+
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool(e1))
         e3 = self.enc3(self.pool(e2))
@@ -125,12 +135,18 @@ class UNet(nn.Module):
         b = self.bottleneck(self.pool(e3))
 
         d3 = self.up3(b)
+        if d3.shape[2:] != e3.shape[2:]:
+            raise RuntimeError("Shape mismatch in skip connection (d3, e3)")
         d3 = self.dec3(torch.cat([d3, e3], dim=1))
 
         d2 = self.up2(d3)
+        if d2.shape[2:] != e2.shape[2:]:
+            raise RuntimeError("Shape mismatch in skip connection (d2, e2)")
         d2 = self.dec2(torch.cat([d2, e2], dim=1))
 
         d1 = self.up1(d2)
+        if d1.shape[2:] != e1.shape[2:]:
+            raise RuntimeError("Shape mismatch in skip connection (d1, e1)")
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
         return torch.sigmoid(self.final(d1))
