@@ -44,7 +44,15 @@ class BUSIDataset(Dataset):
                 self.image_paths.append(img_path)
                 self.mask_paths.append(mask_path)
                 total_examples +=1 
-
+        
+        if len(self.image_paths) != total_examples or len(self.image_paths)!= len(self.mask_paths):
+            raise ValueError(
+                "BUSIDataset: Unexpected parsing error."
+            )
+        if len(self.image_paths)==0:
+            raise ValueError(
+                "BUSIDataset: No valid image-mask pairs found after filtering"
+            )
         print(f'Orphans: {skipped_orphans} \n Corrupt: {skipped_corrupt}')
         print(f'Total: {total_examples}' )
                 
@@ -62,7 +70,10 @@ class BUSIDataset(Dataset):
             )
         
         img = cv2.resize(img, (256, 256))
-        mask = cv2.resize(mask, (256, 256))
+
+        # ensure binary mask
+        mask = cv2.resize(mask, (256, 256), interpolation=cv2.INTER_NEAREST)
+        mask = (mask > 0).astype(np.float32)
 
         img = img / 255.0
         mask = mask / 255.0
