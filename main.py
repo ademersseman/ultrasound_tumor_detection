@@ -7,14 +7,14 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch.nn as nn
 
-path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
-data_dir = os.path.join(path, "Dataset_BUSI_with_GT")
 
-# Dataset Classification
 class BUSIDataset(Dataset):
     def __init__(self, root_dir):
         self.image_paths = []
         self.mask_paths = []
+        skipped_orphans = 0
+        skipped_corrupt = 0
+        total_examples = 0
 
         for cls in ["benign", "malignant", "normal"]:
             folder = os.path.join(root_dir, cls)
@@ -26,10 +26,28 @@ class BUSIDataset(Dataset):
                 img_path = os.path.join(folder, file)
                 mask_path = img_path.replace(".png", "_mask.png")
 
-                if os.path.exists(mask_path):
-                    self.image_paths.append(img_path)
-                    self.mask_paths.append(mask_path)
+                if not os.path.exists(mask_path):
+                    skipped_orphans +=1
+                    continue
 
+                img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+                mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+
+                if img is None or mask is None:
+                    skipped_corrupt += 1
+                    continue
+
+                if img.shape != mask.shape:
+                    skipped_corrupt += 1
+                    continue
+                
+                self.image_paths.append(img_path)
+                self.mask_paths.append(mask_path)
+                total_examples +=1 
+
+        print(f'Orphans: {skipped_orphans} \n Corrupt: {skipped_corrupt}')
+        print(f'Total: {total_examples}' )
+                
     def __len__(self):
         return len(self.image_paths)
 
@@ -37,6 +55,12 @@ class BUSIDataset(Dataset):
         img = cv2.imread(self.image_paths[idx], cv2.IMREAD_GRAYSCALE)
         mask = cv2.imread(self.mask_paths[idx], cv2.IMREAD_GRAYSCALE)
 
+        # should not happen after corruption handling in data load
+        if img is None or mask is None: 
+            raise RuntimeError(
+                f"Failure to read index {idx}: "
+            )
+        
         img = cv2.resize(img, (256, 256))
         mask = cv2.resize(mask, (256, 256))
 
@@ -49,21 +73,6 @@ class BUSIDataset(Dataset):
         return img, mask
 
 
-# Load Dataset
-dataset = BUSIDataset(data_dir)
-
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
-
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False)
-
-print("Dataset size:", len(dataset))
-
-
-# U-Net Model
 class UNet(nn.Module):
     def __init__(self):
         super().__init__()
@@ -119,104 +128,109 @@ class UNet(nn.Module):
         return torch.sigmoid(self.final(d1))
 
 
-# Training Setup
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = UNet().to(device)
-
-MODEL_PATH = "unet_model.pth"
-if os.path.exists(MODEL_PATH):
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-    print("Loaded saved model!")
-    train_model = False
-else:
-    print("No saved model found. Training from scratch...")
-    train_model = True
-
 def bce_dice_loss(pred, target, smooth=1):
-    # BCE part
     bce = nn.BCELoss()(pred, target)
-    
-    # Dice part
     intersection = (pred * target).sum()
     dice = 1 - (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
-    
     return bce + dice
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-
-# 7. Dice Score
 def dice_score(pred, target, smooth=1):
     pred = (pred > 0.65).float()
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
 
 
-# 8. Training Loop
-epochs = 10
-if train_model:
-    for epoch in range(epochs):
-        model.train()
-        total_loss = 0
+def main():
+    path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
+    data_dir = os.path.join(path, "Dataset_BUSI_with_GT")
 
-        for imgs, masks in train_loader:
+    dataset = BUSIDataset(data_dir)
+
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+
+    print("Dataset size:", len(dataset))
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = UNet().to(device)
+
+    MODEL_PATH = "unet_model.pth"
+    if os.path.exists(MODEL_PATH):
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+        print("Loaded saved model!")
+        train_model = False
+    else:
+        print("No saved model found. Training from scratch...")
+        train_model = True
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+    epochs = 10
+    if train_model:
+        for epoch in range(epochs):
+            model.train()
+            total_loss = 0
+
+            for imgs, masks in train_loader:
+                imgs, masks = imgs.to(device), masks.to(device)
+
+                preds = model(imgs)
+                loss = bce_dice_loss(preds, masks)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item()
+
+            print(f"Epoch {epoch+1}, Loss: {total_loss/len(train_loader):.4f}")
+        torch.save(model.state_dict(), MODEL_PATH)
+        print("Model saved!")
+
+    model.eval()
+    dice_total = 0
+
+    with torch.no_grad():
+        for imgs, masks in test_loader:
             imgs, masks = imgs.to(device), masks.to(device)
-
             preds = model(imgs)
-            loss = bce_dice_loss(preds, masks)
+            dice_total += dice_score(preds, masks).item()
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+    print("Average Dice Score:", dice_total / len(test_loader))
 
-            total_loss += loss.item()
+    imgs, masks = next(iter(test_loader))
+    imgs = imgs.to(device)
 
-        print(f"Epoch {epoch+1}, Loss: {total_loss/len(train_loader):.4f}")
-    torch.save(model.state_dict(), MODEL_PATH)
-    print("Model saved!")
-
-
-# Evaluation
-model.eval()
-dice_total = 0
-
-with torch.no_grad():
-    for imgs, masks in test_loader:
-        imgs, masks = imgs.to(device), masks.to(device)
-
+    with torch.no_grad():
         preds = model(imgs)
-        dice_total += dice_score(preds, masks).item()
 
-print("Average Dice Score:", dice_total / len(test_loader))
+    imgs = imgs.cpu()
+    masks = masks.cpu()
+    preds = preds.cpu()
+
+    for i in range(len(imgs)):
+        plt.figure(figsize=(10, 3))
+
+        plt.subplot(1, 3, 1)
+        plt.title("Image")
+        plt.imshow(imgs[i].squeeze(), cmap='gray')
+
+        plt.subplot(1, 3, 2)
+        plt.title("Ground Truth")
+        plt.imshow(masks[i].squeeze(), cmap='gray')
+
+        plt.subplot(1, 3, 3)
+        plt.title("Prediction")
+        plt.imshow((preds[i].squeeze() > 0.65), cmap='gray')
+
+        plt.show()
 
 
-# Visualization
-model.eval()
-
-imgs, masks = next(iter(test_loader))
-imgs = imgs.to(device)
-
-with torch.no_grad():
-    preds = model(imgs)
-
-# Move to CPU for plotting
-imgs = imgs.cpu()
-masks = masks.cpu()
-preds = preds.cpu()
-
-for i in range(len(imgs)):
-    plt.figure(figsize=(10,3))
-
-    plt.subplot(1,3,1)
-    plt.title("Image")
-    plt.imshow(imgs[i].squeeze(), cmap='gray')
-
-    plt.subplot(1,3,2)
-    plt.title("Ground Truth")
-    plt.imshow(masks[i].squeeze(), cmap='gray')
-
-    plt.subplot(1,3,3)
-    plt.title("Prediction")
-    plt.imshow((preds[i].squeeze() > 0.65), cmap='gray')
-
-    plt.show()
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,15 @@
+# Core ML framework — install the CUDA variant for GPU training:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch
+
+# Dataset download from Kaggle
+kagglehub
+
+# Image I/O and resizing
+opencv-python
+
+# Numerical computing
+numpy
+
+# Visualization
+matplotlib
