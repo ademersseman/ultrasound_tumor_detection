@@ -162,9 +162,7 @@ def bce_dice_loss(pred, target, smooth=1):
     if not torch.isfinite(pred).all() or not torch.isfinite(target).all():
         raise ValueError("Non-finite values in inputs")
 
-    pred = torch.clamp(pred, 1e-7, 1 - 1e-7)
-
-    bce = nn.BCELoss()(pred, target)
+    bce = nn.BCEWithLogitsLoss()(pred, target)
     intersection = (pred * target).sum()
     dice = 1 - (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
     return bce + dice
@@ -180,6 +178,7 @@ def dice_score(pred, target, smooth=1, threshold = 0.65):
     if not torch.isfinite(pred).all() or not torch.isfinite(target).all():
         raise ValueError("Non-finite values")
     
+    pred = torch.sigmoid(pred)
     pred = (pred > threshold).float()
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
