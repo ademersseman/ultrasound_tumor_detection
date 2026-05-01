@@ -190,7 +190,7 @@ class ImageAnalysisTab(QWidget):
         
         # Predict (keep raw predictions for heatmap)
         with torch.no_grad():
-            pred_raw = self.model(img_tensor)
+            pred_raw = torch.sigmoid(self.model(img_tensor)) 
         
         self.current_pred_raw = pred_raw.squeeze().cpu().numpy()
                         

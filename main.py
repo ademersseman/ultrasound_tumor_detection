@@ -116,7 +116,7 @@ class UNet(nn.Module):
         d1 = self.up1(d2)
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
-        return torch.sigmoid(self.final(d1))
+        return self.final(d1)
 
 
 # Training Setup
@@ -134,11 +134,12 @@ else:
 
 def bce_dice_loss(pred, target, smooth=1):
     # BCE part
-    bce = nn.BCELoss()(pred, target)
+    bce = nn.BCEWithLogitsLoss()(pred, target)
     
-    # Dice part
-    intersection = (pred * target).sum()
-    dice = 1 - (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
+    # Apply sigmoid here for dice since we need probabilities
+    pred_prob = torch.sigmoid(pred)
+    intersection = (pred_prob * target).sum()
+    dice = 1 - (2 * intersection + smooth) / (pred_prob.sum() + target.sum() + smooth)
     
     return bce + dice
 
@@ -147,7 +148,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 # 7. Dice Score
 def dice_score(pred, target, smooth=1):
-    pred = (pred > 0.65).float()
+    pred = (torch.sigmoid(pred) > 0.65).float()  # add sigmoid
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
 
