@@ -1,12 +1,12 @@
 # Ultrasound Tumor Detection
 
-Semantic segmentation of breast tumors in ultrasound images using a U-Net trained on the [BUSI dataset](https://www.kaggle.com/datasets/aryashah2k/breast-ultrasound-images-dataset). Final project for Cornell ORIE 5270.
+The goal of this project is the segmentation of breast tumors in ultrasound images using a U-Net trained on [BUSI dataset](https://www.kaggle.com/datasets/aryashah2k/breast-ultrasound-images-dataset).
 
 ---
 
 ## Overview
 
-The model takes a grayscale breast ultrasound image and outputs a binary segmentation mask identifying the tumor region. It handles three tissue classes in the dataset — **benign**, **malignant**, and **normal** — treating them uniformly as a segmentation task (tumor present vs. absent).
+The model takes a grayscale breast ultrasound image(ultrasound capture) and outputs a segmentation heatmap identifying the tumor region with confidence levels. It handles three tissue classes in the dataset — **benign**, **malignant**, and **normal** — treating them uniformly as a segmentation task (tumor present vs. absent).
 
 ---
 
@@ -52,7 +52,7 @@ Each encoder/decoder block is two Conv2d + BatchNorm2d + ReLU layers. Skip conne
 | malignant | Cancerous tumors |
 | normal | No tumor present |
 
-The dataset is downloaded automatically via `kagglehub` on first run. A Kaggle account and API key are required.
+The dataset is included in the github and cited in the readme and below
 
 `BUSIDataset` silently skips:
 - **Orphan images** — images with no corresponding `_mask.png`.
@@ -98,30 +98,9 @@ export KAGGLE_KEY=your_api_key
 python main.py
 ```
 
-**First run** — downloads the dataset, trains for 10 epochs, saves `unet_model.pth`, evaluates on the test set, and displays prediction visualizations.
+**First run** — downloads the dataset, trains for 50 epochs, saves `unet_model.pth`, evaluates on the test set, and displays prediction visualizations.
 
 **Subsequent runs** — loads `unet_model.pth`, skips training, evaluates, and visualizes.
-
-To use the model or dataset directly in Python:
-
-```python
-from main import UNet, BUSIDataset, bce_dice_loss, dice_score
-import torch
-
-# Load a trained model
-model = UNet()
-model.load_state_dict(torch.load("unet_model.pth", map_location="cpu"))
-model.eval()
-
-# Run inference — input must be (B, 1, 256, 256), values in [0, 1]
-with torch.no_grad():
-    pred_logits = model(image_tensor)              # raw logits
-    pred_mask = torch.sigmoid(pred_logits) > 0.65 # binary mask
-
-# Load the dataset
-dataset = BUSIDataset("path/to/Dataset_BUSI_with_GT")
-img, mask = dataset[0]  # tensors of shape (1, 256, 256), dtype float32
-```
 
 ### `gui.py` — interactive desktop app
 
@@ -386,3 +365,7 @@ ultrasound_tumor_detection/
     ├── test_model.py  # UNet architecture and persistence tests
     └── test_training.py  # Training step, reproducibility, and integration tests
 ```
+
+## AI Disclosure
+
+AI was used to generate boilerplate code and components of this document.

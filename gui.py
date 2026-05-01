@@ -11,8 +11,10 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector
 
-# Import model and device from main
-from main import UNet, device, MODEL_PATH
+# Import model from main
+from main import UNet
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "unet_model.pth")
 
 class ImageAnalysisTab(QWidget):
     def __init__(self, model, device, image_data, tab_index, parent=None):
