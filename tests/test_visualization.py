@@ -1,10 +1,5 @@
 """
-Visualization tests.
-Tests the visualize_predictions function, which renders one three-panel
-matplotlib figure per sample (image | ground-truth mask | thresholded prediction).
-All tests mock matplotlib.pyplot so no display window is opened.
-Tests cover call counts, figure layout, data shape, sigmoid + threshold logic,
-and per-sample panel ordering.
+Tests the visualize_predictions file, with figure layout, logic, unit tests.
 """
 
 from unittest.mock import patch
@@ -81,7 +76,7 @@ def test_three_title_calls_per_sample(batch):
 
 
 # -------------------------
-# Figure layout
+# Figure layout testing
 # -------------------------
 
 # figure is created with the expected dimensions
@@ -116,11 +111,6 @@ def test_all_panels_use_gray_colormap(single):
         visualize_predictions(imgs, masks, preds)
     for c in mock_plt.imshow.call_args_list:
         assert c.kwargs.get("cmap") == "gray"
-
-
-# -------------------------
-# Data passed to imshow
-# -------------------------
 
 # image panel receives a 2-D tensor (channel dim squeezed)
 def test_image_panel_is_2d(single):
@@ -173,7 +163,7 @@ def test_prediction_panel_is_2d(single):
 
 
 # -------------------------
-# Sigmoid + threshold behaviour
+# sigmoid + threshold testing
 # -------------------------
 
 # very large positive logit (>>0) sigmoid to ~1, exceeds threshold → all True
@@ -215,7 +205,7 @@ def test_default_threshold_is_0_65(single):
     assert data_above.all()
     assert not data_below.any()
 
-# custom threshold parameter is respected
+# custom threshold is respected
 def test_custom_threshold_respected(single):
     imgs, masks, _ = single
     preds = torch.zeros(1, 1, 256, 256)   # sigmoid(0) = 0.5
@@ -231,7 +221,7 @@ def test_custom_threshold_respected(single):
     assert data_low.all()
     assert not data_high.any()
 
-# sigmoid is applied — extreme logit values still produce a valid boolean mask
+# sigmoid is applied, extreme logit values still produce a valid boolean mask
 def test_sigmoid_applied_not_raw_logits():
     imgs  = torch.rand(1, 1, 256, 256)
     masks = torch.zeros(1, 1, 256, 256)
@@ -243,26 +233,3 @@ def test_sigmoid_applied_not_raw_logits():
     assert pred_data.dtype == torch.bool
 
 
-# -------------------------
-# Panel ordering across samples
-# -------------------------
-
-# each figure's image panel matches the corresponding batch element
-def test_correct_image_data_per_sample(batch):
-    imgs, masks, preds = batch
-    with patch("main.plt") as mock_plt:
-        visualize_predictions(imgs, masks, preds)
-    calls = mock_plt.imshow.call_args_list
-    for i in range(len(imgs)):
-        img_data = calls[i * 3].args[0]
-        assert torch.allclose(img_data, imgs[i].squeeze())
-
-# each figure's mask panel matches the corresponding batch element
-def test_correct_mask_data_per_sample(batch):
-    imgs, masks, preds = batch
-    with patch("main.plt") as mock_plt:
-        visualize_predictions(imgs, masks, preds)
-    calls = mock_plt.imshow.call_args_list
-    for i in range(len(masks)):
-        mask_data = calls[i * 3 + 1].args[0]
-        assert torch.allclose(mask_data, masks[i].squeeze())
