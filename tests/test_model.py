@@ -1,6 +1,5 @@
 """
-Model architecture tests — verify tensor flow and parameter structure,
-not statistical accuracy.
+Model architecture tests — verify tensor flow and parameter structure.
 """
 
 import os
