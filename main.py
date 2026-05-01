@@ -70,10 +70,7 @@ class BUSIDataset(Dataset):
             )
         
         img = cv2.resize(img, (256, 256))
-
-        # ensure binary mask
-        mask = cv2.resize(mask, (256, 256), interpolation=cv2.INTER_NEAREST)
-        mask = (mask > 0).astype(np.float32)
+        mask = cv2.resize(img, (256, 256))
 
         img = img / 255.0
         mask = mask / 255.0
