@@ -9,6 +9,7 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.widgets import RectangleSelector
 
 # Import model and device from main
 from main import UNet, device, MODEL_PATH
@@ -21,6 +22,13 @@ class ImageAnalysisTab(QWidget):
         self.image_data = image_data
         self.tab_index = tab_index
         self.current_pred_raw = None
+        
+        # Panning variables
+        self.panning = False
+        self.press_x = None
+        self.press_y = None
+        self.orig_xlim = None
+        self.orig_ylim = None
         
         self.initUI()
     
@@ -43,6 +51,10 @@ class ImageAnalysisTab(QWidget):
         conf_font.setPointSize(11)
         self.conf_label.setFont(conf_font)
         left_layout.addWidget(self.conf_label)
+
+        self.reset_btn = QPushButton("Reset Zoom")
+        self.reset_btn.clicked.connect(self.reset_zoom)
+        left_layout.addWidget(self.reset_btn)
         
         # Confidence bar
         self.conf_bar = QProgressBar()
@@ -85,40 +97,90 @@ class ImageAnalysisTab(QWidget):
 
         # Original image
         orig_title = QLabel("Raw Image")
-        orig_font = QFont()
-        orig_font.setBold(True)
-        orig_title.setFont(orig_font)
         orig_title.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(orig_title)
 
-        self.img_label = QLabel()
-        self.img_label.setAlignment(Qt.AlignCenter)
-        self.img_label.setMinimumSize(280, 280)
-        right_layout.addWidget(self.img_label)
+        self.orig_canvas = FigureCanvas(Figure(figsize=(3.5, 3.5), dpi=100))
+        self.orig_canvas.setStyleSheet("background-color: #292929;")
+        self.orig_canvas.figure.patch.set_facecolor('#292929')
+        self.orig_ax = self.orig_canvas.figure.subplots()
+        self.orig_ax.set_facecolor('#292929')
+        self.orig_ax.axis('off')
+        right_layout.addWidget(self.orig_canvas)
 
         # Heatmap below
         heatmap_title = QLabel("Heatmap")
-        heatmap_font = QFont()
-        heatmap_font.setBold(True)
-        heatmap_title.setFont(heatmap_font)
         heatmap_title.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(heatmap_title)
 
-        fig = Figure(figsize=(3.5, 3.5), dpi=100)
-        fig.patch.set_facecolor('#292929')
-        self.heatmap_canvas = FigureCanvas(fig)
+        self.heatmap_canvas = FigureCanvas(Figure(figsize=(3.5, 3.5), dpi=100))
         self.heatmap_canvas.setStyleSheet("background-color: #292929;")
-        right_layout.addWidget(self.heatmap_canvas)
+        self.heatmap_canvas.figure.patch.set_facecolor('#292929')
+        self.heatmap_ax = self.heatmap_canvas.figure.subplots()
+        self.heatmap_ax.axis('off')
+        self.heatmap_ax.set_facecolor('#292929')
+        right_layout.addWidget(self.heatmap_canvas, alignment=Qt.AlignHCenter)
 
         layout.addLayout(left_layout, 1)
         layout.addLayout(right_layout, 2.5)        
         self.setLayout(layout)
-        
-        # Display original image
-        self.display_image(self.image_data['image'], self.img_label)
 
+        self.display_image()
         self.predict()
+        
+        # Zoom selectors
+        self.selector = RectangleSelector(
+            self.orig_ax,
+            self.on_select,
+            useblit=True,
+            button=[1],
+            spancoords='pixels',
+            interactive=True,
+        )
+        self.heatmap_selector = RectangleSelector(
+            self.heatmap_ax,
+            self.on_select,
+            useblit=True,
+            button=[1],
+            spancoords='pixels',
+            interactive=True,
+        )
+        
+        # Connect panning events to both canvases
+        self.orig_canvas.mpl_connect('button_press_event', self.on_press)
+        self.orig_canvas.mpl_connect('motion_notify_event', self.on_motion)
+        self.orig_canvas.mpl_connect('button_release_event', self.on_release)
+        
+        self.heatmap_canvas.mpl_connect('button_press_event', self.on_press)
+        self.heatmap_canvas.mpl_connect('motion_notify_event', self.on_motion)
+        self.heatmap_canvas.mpl_connect('button_release_event', self.on_release)
     
+    def display_image(self):
+        self.orig_ax.clear()
+        self.orig_ax.set_facecolor('#292929')
+        self.orig_canvas.figure.patch.set_facecolor('#292929')
+        self.orig_ax.imshow(self.image_data['image'], cmap='gray', origin='upper')
+        self.orig_ax.axis('off')
+        self.orig_canvas.draw()
+
+    def display_heatmap(self):
+        if self.current_pred_raw is None:
+            return
+
+        self.heatmap_ax.clear()
+        self.heatmap_ax.set_facecolor('#292929')
+        self.heatmap_canvas.figure.patch.set_facecolor('#292929')
+
+        im = self.heatmap_ax.imshow(self.current_pred_raw, cmap='hot', vmin=0, vmax=1, origin='upper')
+        self.heatmap_ax.axis('off')
+
+        cbar = self.heatmap_canvas.figure.colorbar(im, ax=self.heatmap_ax, fraction=0.046, pad=0.04)
+        cbar.outline.set_edgecolor('#292929')
+        cbar.ax.yaxis.set_tick_params(color='white')
+        cbar.ax.yaxis.label.set_color('white')
+
+        self.heatmap_canvas.draw()
+
     def predict(self):
         if self.image_data['image'] is None:
             return
@@ -174,35 +236,108 @@ class ImageAnalysisTab(QWidget):
             f"Max Confidence: {max_conf:.1f}%"
         )
     
-    def display_image(self, cv_image, label):
-        h, w = cv_image.shape
-        bytes_per_line = w
-        q_img = QImage(cv_image.data, w, h, bytes_per_line, QImage.Format_Grayscale8)
-        pixmap = QPixmap.fromImage(q_img)
-        pixmap = pixmap.scaledToWidth(280, Qt.SmoothTransformation)
-        label.setPixmap(pixmap)
-    
-    def display_heatmap(self):
-        if self.current_pred_raw is None:
+    def on_select(self, eclick, erelease):
+        if eclick.xdata is None or erelease.xdata is None:
             return
+
+        x1, y1 = int(eclick.xdata), int(eclick.ydata)
+        x2, y2 = int(erelease.xdata), int(erelease.ydata)
+        self.zoom_region(x1, y1, x2, y2)
+
+        # Hide the zoom box after selection
+        if hasattr(self, "selector"):
+            self.selector.set_visible(False)
+        if hasattr(self, "heatmap_selector"):
+            self.heatmap_selector.set_visible(False)
+
+        # Disable selectors after zooming to enable panning
+        if hasattr(self, "selector"):
+            self.selector.set_active(False)
+        if hasattr(self, "heatmap_selector"):
+            self.heatmap_selector.set_active(False)
+
+        self.orig_canvas.draw_idle()
+        self.heatmap_canvas.draw_idle()
+    
+    def zoom_region(self, x1, y1, x2, y2):
+        xmin, xmax = sorted((x1, x2))
+        ymin, ymax = sorted((y1, y2))
+
+        self.orig_ax.set_xlim(xmin, xmax)
+        self.orig_ax.set_ylim(ymax, ymin)
+        self.heatmap_ax.set_xlim(xmin, xmax)
+        self.heatmap_ax.set_ylim(ymax, ymin)
+
+        self.orig_canvas.draw()
+        self.heatmap_canvas.draw()
+
+    def on_press(self, event):
+        if event.button == 1 and event.xdata is not None and event.ydata is not None:
+            # Don't pan if selectors are active (during zoom selection)
+            if (hasattr(self, "selector") and self.selector.get_active()) or \
+               (hasattr(self, "heatmap_selector") and self.heatmap_selector.get_active()):
+                return
+            
+            # Check if zoomed in (not at full limits)
+            if self.is_zoomed():
+                self.panning = True
+                self.press_x = event.xdata
+                self.press_y = event.ydata
+                self.orig_xlim = self.orig_ax.get_xlim()
+                self.orig_ylim = self.orig_ax.get_ylim()
+
+    def on_motion(self, event):
+        if self.panning and event.xdata is not None and event.ydata is not None:
+            dx = self.press_x - event.xdata
+            dy = self.press_y - event.ydata
+            
+            new_xlim = (self.orig_xlim[0] + dx, self.orig_xlim[1] + dx)
+            new_ylim = (self.orig_ylim[0] + dy, self.orig_ylim[1] + dy)
+            
+            self.orig_ax.set_xlim(new_xlim)
+            self.orig_ax.set_ylim(new_ylim)
+            self.heatmap_ax.set_xlim(new_xlim)
+            self.heatmap_ax.set_ylim(new_ylim)
+            
+            self.orig_canvas.draw_idle()
+            self.heatmap_canvas.draw_idle()
+
+    def on_release(self, event):
+        if event.button == 1:
+            self.panning = False
+            self.press_x = None
+            self.press_y = None
+            self.orig_xlim = None
+            self.orig_ylim = None
+
+    def is_zoomed(self):
+        """Check if the view is zoomed in."""
+        h, w = self.image_data['image'].shape
+        xlim = self.orig_ax.get_xlim()
+        ylim = self.orig_ax.get_ylim()
+        return not (xlim == (0, w) and ylim == (h, 0))
+
+    def reset_zoom(self):
+        if self.image_data["image"] is None:
+            return
+
+        h, w = self.image_data["image"].shape
+        self.orig_ax.set_xlim(0, w)
+        self.orig_ax.set_ylim(h, 0)
+
+        if self.current_pred_raw is not None:
+            ph, pw = self.current_pred_raw.shape
+            self.heatmap_ax.set_xlim(0, pw)
+            self.heatmap_ax.set_ylim(ph, 0)
+
+        # Re-enable selectors for zooming
+        if hasattr(self, "selector"):
+            self.selector.set_active(True)
+        if hasattr(self, "heatmap_selector"):
+            self.heatmap_selector.set_active(True)
         
-        bg_color = '#292929'
-
-        fig = self.heatmap_canvas.figure
-        fig.clear()
-        fig.patch.set_facecolor(bg_color)
-
-        # Create main axis manually positioned
-        ax = fig.add_axes([0.25, 0.1, 0.5, 0.8])  # [left, bottom, width, height] [0.1, 0.1, 0.65, 0.8]
-        ax.set_facecolor(bg_color)
-
-        im = ax.imshow(self.current_pred_raw, cmap='hot', vmin=0, vmax=1)
-        ax.axis('off')
-
-        # Create separate colorbar axis
-        cax = fig.add_axes([0.8, 0.1, 0.03, 0.8])
-        fig.colorbar(im, cax=cax, label='Confidence')
-
+        self.panning = False
+        self.orig_canvas.draw()
         self.heatmap_canvas.draw()
 
 class UltrasoundGUI(QMainWindow):
