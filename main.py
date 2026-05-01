@@ -159,8 +159,6 @@ def bce_dice_loss(pred, target, smooth=1):
     if pred.numel() == 0:
         raise ValueError("Empty tensors passed to loss")
 
-def bce_dice_loss(pred, target, smooth=1):
-    # BCE part
     bce = nn.BCEWithLogitsLoss()(pred, target)
     
     # Apply sigmoid here for dice since we need probabilities
@@ -177,10 +175,8 @@ def dice_score(pred, target, smooth=1, threshold = 0.65):
 
     if pred.numel() == 0:
         raise ValueError("Empty tensors")
-
-# 7. Dice Score
-def dice_score(pred, target, smooth=1):
-    pred = (torch.sigmoid(pred) > 0.65).float()  # add sigmoid
+    
+    pred = (torch.sigmoid(pred) > threshold).float()  # add sigmoid
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
 
@@ -262,7 +258,9 @@ def main():
 
         plt.subplot(1, 3, 1)
         plt.title("Image")
-        plt.imshow(imgs[i].squeeze(), cmap='gray')
+        # plt.imshow(imgs[i].squeeze(), cmap='gray')
+        plt.imshow((torch.sigmoid(preds[i].squeeze()) > 0.65), cmap='gray')
+
 
         plt.subplot(1, 3, 2)
         plt.title("Ground Truth")
@@ -270,7 +268,9 @@ def main():
 
         plt.subplot(1, 3, 3)
         plt.title("Prediction")
-        plt.imshow((preds[i].squeeze() > 0.65), cmap='gray')
+        # plt.imshow((preds[i].squeeze() > 0.65), cmap='gray')
+        plt.imshow((torch.sigmoid(preds[i].squeeze()) > 0.65), cmap='gray')
+
 
         plt.show()
 
