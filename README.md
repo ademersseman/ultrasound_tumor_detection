@@ -162,6 +162,7 @@ Train/evaluate entry points are thin wrappers around the same pipeline:
 ```bash
 utd-train --data-dir Dataset_BUSI_with_GT --epochs 10 --model-path models/unet_model.pth
 utd-evaluate --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth --no-show
+utd-gui --model-path models/my_custom_model.pth
 ```
 
 To train your own checkpoint without replacing the default local model path, choose another path that does not already exist:
@@ -176,11 +177,18 @@ The source-checkout script wrappers are also available:
 python scripts/run_pipeline.py --data-dir Dataset_BUSI_with_GT
 python scripts/train_model.py --data-dir Dataset_BUSI_with_GT
 python scripts/evaluate_model.py --data-dir Dataset_BUSI_with_GT --no-show
+python scripts/launch_gui.py
 ```
 
 ## GUI Usage
 
 The GUI is implemented inside the package as `src/ultrasound_tumor_detection/__main__.py`, not as a top-level `gui.py`. After installing the GUI extra, launch it with:
+
+```bash
+utd-gui
+```
+
+Or use the module directly:
 
 ```bash
 python -m ultrasound_tumor_detection
