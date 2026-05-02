@@ -58,7 +58,7 @@ Input (B, 1, H, W), where H and W are divisible by 8
 Output (B, 1, H, W) raw logits
 ```
 
-Each convolution block is two `Conv2d + BatchNorm2d + ReLU` layers. The model returns raw logits; `sigmoid` is applied by the loss, metric, visualization, and GUI inference code as needed.
+Each convolution block is two `Conv2d + BatchNorm2d + ReLU` layers. The model returns raw logits; `sigmoid` is applied by the metric, visualization, and GUI inference code. The loss function clamps predictions to `[1e-7, 1-1e-7]` instead of applying `sigmoid`.
 
 `UNet.forward()` validates its input and raises:
 
@@ -157,15 +157,14 @@ utd-run --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth
 utd-run --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth --no-show
 ```
 
-Train/evaluate entry points are thin wrappers around the same pipeline:
+Evaluate on an existing checkpoint without running the full pipeline:
 
 ```bash
-utd-train --data-dir Dataset_BUSI_with_GT --epochs 10 --model-path models/unet_model.pth
 utd-evaluate --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth --no-show
 utd-gui --model-path models/my_custom_model.pth
 ```
 
-To train your own checkpoint without replacing the default local model path, choose another path that does not already exist:
+To train a new checkpoint without replacing the default local model path, choose a path that does not already exist:
 
 ```bash
 utd-run --data-dir Dataset_BUSI_with_GT --epochs 10 --model-path models/my_unet_model.pth
@@ -175,14 +174,13 @@ The source-checkout script wrappers are also available:
 
 ```bash
 python scripts/run_pipeline.py --data-dir Dataset_BUSI_with_GT
-python scripts/train_model.py --data-dir Dataset_BUSI_with_GT
 python scripts/evaluate_model.py --data-dir Dataset_BUSI_with_GT --no-show
 python scripts/launch_gui.py
 ```
 
 ## GUI Usage
 
-The GUI is implemented inside the package as `src/ultrasound_tumor_detection/__main__.py`, not as a top-level `gui.py`. After installing the GUI extra, launch it with:
+The GUI is implemented inside the package as `src/ultrasound_tumor_detection/__main__.py`. After installing the GUI extra, launch it with:
 
 ```bash
 utd-gui
@@ -194,7 +192,7 @@ Or use the module directly:
 python -m ultrasound_tumor_detection
 ```
 
-The GUI is a PyQt5 desktop app titled `Ultrasound Tumor Detection - Multi-Image Analysis`. It loads a `UNet`, runs on CUDA when available, and uses the default checkpoint resolution:
+The GUI is a PyQt5 desktop app titled `Ultrasound Tumor Detection - Multi-Image Analysis`. It requires an existing model (or the package asset model) to run. It loads a `UNet`, runs on CUDA when available, and uses the default checkpoint resolution:
 
 ```text
 1. models/unet_model.pth
@@ -233,14 +231,15 @@ Per tab:      left metrics/control panel + right raw-image and heatmap canvases
 | Batch size | 8 by default |
 | Optimizer | Adam, `lr=1e-4` |
 | Epochs | 10 by default |
-| Loss | BCE with logits + Dice loss |
+| Loss | Plain BCE + Dice loss |
 | Prediction threshold | 0.65 for visualized/GUI masks |
 
 Loss:
 
 ```text
-loss = BCEWithLogits(pred_logits, target_mask)
-     + (1 - Dice(sigmoid(pred_logits), target_mask))
+pred = pred_logits.clamp(1e-7, 1 - 1e-7)
+loss = BCE(pred, target_mask)
+     + Dice(pred, target_mask)
 ```
 
 The evaluation metric is average Dice score on the held-out test loader.

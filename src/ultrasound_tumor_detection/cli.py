@@ -29,10 +29,6 @@ def run(argv=None):
     )
 
 
-def train(argv=None):
-    run(argv)
-
-
 def evaluate(argv=None):
     parser = _parser("Evaluate an existing checkpoint on BUSI data.")
     args = parser.parse_args(argv)

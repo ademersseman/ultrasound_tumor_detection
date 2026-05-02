@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from ultrasound_tumor_detection.cli import _parser, evaluate, gui, run, train
+from ultrasound_tumor_detection.cli import _parser, evaluate, gui, run
 from ultrasound_tumor_detection.pipeline import MODEL_PATH
 
 
@@ -89,23 +89,6 @@ class TestRun:
             run(["--model-path", "/tmp/custom.pth"])
         _, kwargs = mock_rp.call_args
         assert kwargs["model_path"] == "/tmp/custom.pth"
-
-
-# -------------------------
-# train()
-# -------------------------
-
-class TestTrain:
-    def test_train_delegates_to_run_pipeline(self):
-        with patch("ultrasound_tumor_detection.cli.run_pipeline") as mock_rp:
-            train([])
-        mock_rp.assert_called_once()
-
-    def test_train_passes_argv_through(self):
-        with patch("ultrasound_tumor_detection.cli.run_pipeline") as mock_rp:
-            train(["--epochs", "2"])
-        _, kwargs = mock_rp.call_args
-        assert kwargs["epochs"] == 2
 
 
 # -------------------------

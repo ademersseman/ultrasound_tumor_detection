@@ -23,7 +23,6 @@ gui = [
 
 [project.scripts]
 utd-run = "ultrasound_tumor_detection.cli:run"
-utd-train = "ultrasound_tumor_detection.cli:train"
 utd-evaluate = "ultrasound_tumor_detection.cli:evaluate"
 utd-gui = "ultrasound_tumor_detection.cli:gui"
 
