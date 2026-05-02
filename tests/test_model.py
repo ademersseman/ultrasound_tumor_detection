@@ -9,7 +9,7 @@ import tempfile
 import pytest
 import torch
 
-from main import UNet
+from ultrasound_tumor_detection.model import UNet
 
 class TestUNetArchitecture:
     # output spatial dims check

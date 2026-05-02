@@ -1,4 +1,8 @@
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
 import cv2
 import torch
 import numpy as np
@@ -11,8 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector
 
-# Import model from main
-from main import UNet
+from ultrasound_tumor_detection import UNet
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "unet_model.pth")
 

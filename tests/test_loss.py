@@ -6,7 +6,7 @@ Includes different edge cases for bce/dice loss and dice score
 import pytest
 import torch
 
-from main import bce_dice_loss, dice_score
+from ultrasound_tumor_detection.losses import bce_dice_loss, dice_score
 
 # -------------------------
 # Dice Score Tests

@@ -15,7 +15,7 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from main import BUSIDataset
+from ultrasound_tumor_detection.data import BUSIDataset
 
 
 # -------------------------

@@ -6,7 +6,9 @@ import pytest
 import torch
 import torch.optim as optim
 
-from main import BUSIDataset, UNet, bce_dice_loss
+from ultrasound_tumor_detection.data import BUSIDataset
+from ultrasound_tumor_detection.losses import bce_dice_loss
+from ultrasound_tumor_detection.model import UNet
 
 
 class TestTrainingStepMechanics:

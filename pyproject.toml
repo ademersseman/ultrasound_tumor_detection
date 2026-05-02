@@ -1,0 +1,31 @@
+[project]
+name = "ultrasound-tumor-detection"
+version = "0.1.0"
+description = "U-Net tumor segmentation for breast ultrasound images."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "kagglehub",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "torch",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+gui = [
+    "PyQt5",
+]
+
+[project.scripts]
+utd-run = "ultrasound_tumor_detection.cli:run"
+utd-train = "ultrasound_tumor_detection.cli:train"
+utd-evaluate = "ultrasound_tumor_detection.cli:evaluate"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

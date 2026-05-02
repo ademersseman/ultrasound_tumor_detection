@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 import torch
 
-from main import visualize_predictions
+from ultrasound_tumor_detection.visualization import visualize_predictions
 
 THRESHOLD = 0.65
 
@@ -42,35 +42,35 @@ def single():
 # one plt.figure() call per sample in the batch
 def test_one_figure_per_sample(batch):
     imgs, masks, preds = batch
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     assert mock_plt.figure.call_count == len(imgs)
 
 # plt.show() fires exactly once per sample
 def test_show_called_once_per_sample(batch):
     imgs, masks, preds = batch
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     assert mock_plt.show.call_count == len(imgs)
 
 # three imshow calls per sample: image, mask, prediction
 def test_three_imshow_calls_per_sample(batch):
     imgs, masks, preds = batch
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     assert mock_plt.imshow.call_count == 3 * len(imgs)
 
 # three subplot calls per sample (one per panel)
 def test_three_subplot_calls_per_sample(batch):
     imgs, masks, preds = batch
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     assert mock_plt.subplot.call_count == 3 * len(imgs)
 
 # three title calls per sample
 def test_three_title_calls_per_sample(batch):
     imgs, masks, preds = batch
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     assert mock_plt.title.call_count == 3 * len(imgs)
 
@@ -82,14 +82,14 @@ def test_three_title_calls_per_sample(batch):
 # figure is created with the expected dimensions
 def test_figsize(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     mock_plt.figure.assert_called_with(figsize=(10, 3))
 
 # subplots are arranged in a 1×3 grid at indices 1, 2, 3
 def test_subplot_indices(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     subplot_calls = [c.args for c in mock_plt.subplot.call_args_list]
     assert (1, 3, 1) in subplot_calls
@@ -99,7 +99,7 @@ def test_subplot_indices(single):
 # panels are titled Image, Ground Truth, Prediction in order
 def test_panel_titles(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     titles = [c.args[0] for c in mock_plt.title.call_args_list]
     assert titles == ["Image", "Ground Truth", "Prediction"]
@@ -107,7 +107,7 @@ def test_panel_titles(single):
 # all three panels use the grayscale colormap
 def test_all_panels_use_gray_colormap(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     for c in mock_plt.imshow.call_args_list:
         assert c.kwargs.get("cmap") == "gray"
@@ -115,7 +115,7 @@ def test_all_panels_use_gray_colormap(single):
 # image panel receives a 2-D tensor (channel dim squeezed)
 def test_image_panel_is_2d(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     img_data = mock_plt.imshow.call_args_list[0].args[0]
     assert img_data.ndim == 2
@@ -123,7 +123,7 @@ def test_image_panel_is_2d(single):
 # image panel spatial size matches 256×256 input
 def test_image_panel_shape_matches_input(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     img_data = mock_plt.imshow.call_args_list[0].args[0]
     assert img_data.shape == (256, 256)
@@ -131,7 +131,7 @@ def test_image_panel_shape_matches_input(single):
 # mask panel receives a 2-D tensor
 def test_mask_panel_is_2d(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     mask_data = mock_plt.imshow.call_args_list[1].args[0]
     assert mask_data.ndim == 2
@@ -139,7 +139,7 @@ def test_mask_panel_is_2d(single):
 # prediction panel is a boolean tensor after sigmoid + threshold
 def test_prediction_panel_is_boolean(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     pred_data = mock_plt.imshow.call_args_list[2].args[0]
     assert pred_data.dtype == torch.bool
@@ -147,7 +147,7 @@ def test_prediction_panel_is_boolean(single):
 # prediction panel contains only True / False
 def test_prediction_panel_values_are_binary(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     pred_data = mock_plt.imshow.call_args_list[2].args[0]
     unique = set(pred_data.flatten().tolist())
@@ -156,7 +156,7 @@ def test_prediction_panel_values_are_binary(single):
 # prediction panel is 2-D
 def test_prediction_panel_is_2d(single):
     imgs, masks, preds = single
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     pred_data = mock_plt.imshow.call_args_list[2].args[0]
     assert pred_data.ndim == 2
@@ -170,7 +170,7 @@ def test_prediction_panel_is_2d(single):
 def test_large_positive_logit_maps_to_true(single):
     imgs, masks, _ = single
     preds = torch.full((1, 1, 256, 256), 10.0)
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     pred_data = mock_plt.imshow.call_args_list[2].args[0]
     assert pred_data.all()
@@ -179,7 +179,7 @@ def test_large_positive_logit_maps_to_true(single):
 def test_large_negative_logit_maps_to_false(single):
     imgs, masks, _ = single
     preds = torch.full((1, 1, 256, 256), -10.0)
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     pred_data = mock_plt.imshow.call_args_list[2].args[0]
     assert not pred_data.any()
@@ -194,11 +194,11 @@ def test_default_threshold_is_0_65(single):
     preds_above = torch.full((1, 1, 256, 256), just_above.item())
     preds_below = torch.full((1, 1, 256, 256), just_below.item())
 
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds_above)
     data_above = mock_plt.imshow.call_args_list[2].args[0]
 
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds_below)
     data_below = mock_plt.imshow.call_args_list[2].args[0]
 
@@ -210,11 +210,11 @@ def test_custom_threshold_respected(single):
     imgs, masks, _ = single
     preds = torch.zeros(1, 1, 256, 256)   # sigmoid(0) = 0.5
 
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds, threshold=0.49)
     data_low = mock_plt.imshow.call_args_list[2].args[0]
 
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds, threshold=0.51)
     data_high = mock_plt.imshow.call_args_list[2].args[0]
 
@@ -227,7 +227,7 @@ def test_sigmoid_applied_not_raw_logits():
     masks = torch.zeros(1, 1, 256, 256)
     preds = torch.randn(1, 1, 256, 256) * 10
 
-    with patch("main.plt") as mock_plt:
+    with patch("ultrasound_tumor_detection.visualization.plt") as mock_plt:
         visualize_predictions(imgs, masks, preds)
     pred_data = mock_plt.imshow.call_args_list[2].args[0]
     assert pred_data.dtype == torch.bool

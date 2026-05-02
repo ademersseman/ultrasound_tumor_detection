@@ -13,8 +13,9 @@ import numpy as np
 import pytest
 import torch
 
-import main as main_module
-from main import UNet, main
+import ultrasound_tumor_detection.pipeline as main_module
+from ultrasound_tumor_detection.model import UNet
+from ultrasound_tumor_detection.pipeline import MODEL_PATH, main
 
 _real_exists = os.path.exists
 
@@ -25,13 +26,13 @@ _real_exists = os.path.exists
 
 # os.path.exists that returns False only for the model checkpoint
 def _fake_exists_no_model(path):
-    if path == "unet_model.pth":
+    if path == MODEL_PATH:
         return False
     return _real_exists(path)
 
 # os.path.exists that returns True only for the model checkpoint
 def _fake_exists_with_model(path):
-    if path == "unet_model.pth":
+    if path == MODEL_PATH:
         return True
     return _real_exists(path)
 
@@ -71,22 +72,22 @@ def set_seed():
 
 # run main() with no saved model (aka we want to train)
 def run_no_model(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir) as mock_dl, \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
-         patch("main.torch.save") as mock_save, \
-         patch("main.visualize_predictions") as mock_viz, \
-         patch("main.EPOCHS", 1):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir) as mock_dl, \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.save") as mock_save, \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions") as mock_viz, \
+         patch("ultrasound_tumor_detection.pipeline.EPOCHS", 1):
         main()
     return mock_dl, mock_save, mock_viz
 
 # run main() with an existing saved model (skip training, use model)
 def run_with_model(kaggle_dir):
     state_dict = UNet().state_dict()
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_with_model), \
-         patch("main.torch.load", return_value=state_dict) as mock_load, \
-         patch("main.torch.save") as mock_save, \
-         patch("main.visualize_predictions") as mock_viz:
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_with_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.load", return_value=state_dict) as mock_load, \
+         patch("ultrasound_tumor_detection.pipeline.torch.save") as mock_save, \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions") as mock_viz:
         main()
     return mock_load, mock_save, mock_viz
 
@@ -107,7 +108,7 @@ def test_torch_save_called_once(kaggle_dir):
 # weights are saved under the expected filename
 def test_model_saved_to_correct_path(kaggle_dir):
     _, mock_save, _ = run_no_model(kaggle_dir)
-    assert mock_save.call_args[0][1] == "unet_model.pth"
+    assert mock_save.call_args[0][1] == MODEL_PATH
 
 # dataset is fetched with the correct Kaggle slug
 def test_kaggle_slug_correct(kaggle_dir):
@@ -141,7 +142,7 @@ def test_torch_load_called(kaggle_dir):
 # checkpoint is loaded from the expected path
 def test_torch_load_uses_model_path(kaggle_dir):
     mock_load, _, _ = run_with_model(kaggle_dir)
-    assert mock_load.call_args[0][0] == "unet_model.pth"
+    assert mock_load.call_args[0][0] == MODEL_PATH
 
 # visualize_predictions is called once even without training
 def test_with_model_visualize_called(kaggle_dir):
@@ -154,22 +155,22 @@ def test_with_model_visualize_called(kaggle_dir):
 
 # BUSIDataset is constructed with <download_path>/Dataset_BUSI_with_GT
 def test_busi_dataset_receives_correct_path(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
-         patch("main.torch.save"), \
-         patch("main.visualize_predictions"), \
-         patch("main.EPOCHS", 1), \
-         patch("main.BUSIDataset", wraps=main_module.BUSIDataset) as mock_ds:
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.save"), \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions"), \
+         patch("ultrasound_tumor_detection.pipeline.EPOCHS", 1), \
+         patch("ultrasound_tumor_detection.pipeline.BUSIDataset", wraps=main_module.BUSIDataset) as mock_ds:
         main()
     assert mock_ds.call_args[0][0] == os.path.join(kaggle_dir, "Dataset_BUSI_with_GT")
 
 # tensors passed to visualize_predictions are on the CPU
 def test_visualize_receives_cpu_tensors(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
-         patch("main.torch.save"), \
-         patch("main.visualize_predictions") as mock_viz, \
-         patch("main.EPOCHS", 1):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.save"), \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions") as mock_viz, \
+         patch("ultrasound_tumor_detection.pipeline.EPOCHS", 1):
         main()
     imgs, masks, preds = mock_viz.call_args[0]
     assert imgs.device.type == "cpu"
@@ -178,11 +179,11 @@ def test_visualize_receives_cpu_tensors(kaggle_dir):
 
 # all three tensors are 4-D (B, C, H, W)
 def test_visualize_receives_4d_tensors(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
-         patch("main.torch.save"), \
-         patch("main.visualize_predictions") as mock_viz, \
-         patch("main.EPOCHS", 1):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.save"), \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions") as mock_viz, \
+         patch("ultrasound_tumor_detection.pipeline.EPOCHS", 1):
         main()
     imgs, masks, preds = mock_viz.call_args[0]
     assert imgs.ndim == 4
@@ -191,33 +192,33 @@ def test_visualize_receives_4d_tensors(kaggle_dir):
 
 # imgs, masks, preds share the same shape
 def test_visualize_tensors_have_matching_shapes(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
-         patch("main.torch.save"), \
-         patch("main.visualize_predictions") as mock_viz, \
-         patch("main.EPOCHS", 1):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.save"), \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions") as mock_viz, \
+         patch("ultrasound_tumor_detection.pipeline.EPOCHS", 1):
         main()
     imgs, masks, preds = mock_viz.call_args[0]
     assert imgs.shape == masks.shape == preds.shape
 
 # images are single-channel (grayscale)
 def test_visualize_single_channel_images(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
-         patch("main.torch.save"), \
-         patch("main.visualize_predictions") as mock_viz, \
-         patch("main.EPOCHS", 1):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.save"), \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions") as mock_viz, \
+         patch("ultrasound_tumor_detection.pipeline.EPOCHS", 1):
         main()
     imgs, _, _ = mock_viz.call_args[0]
     assert imgs.shape[1] == 1
 
 # model outputs probabilities in [0, 1] (sigmoid applied in forward)
 def test_prediction_values_in_zero_one_range(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
-         patch("main.torch.save"), \
-         patch("main.visualize_predictions") as mock_viz, \
-         patch("main.EPOCHS", 1):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.save"), \
+         patch("ultrasound_tumor_detection.pipeline.visualize_predictions") as mock_viz, \
+         patch("ultrasound_tumor_detection.pipeline.EPOCHS", 1):
         main()
     _, _, preds = mock_viz.call_args[0]
     assert preds.min().item() >= 0.0
@@ -229,17 +230,17 @@ def test_dataset_failure_raises(kaggle_dir):
     shutil.rmtree(os.path.join(empty_root, "Dataset_BUSI_with_GT"))
     os.makedirs(os.path.join(empty_root, "Dataset_BUSI_with_GT"))
 
-    with patch("main.kagglehub.dataset_download", return_value=empty_root), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=empty_root), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_no_model):
 
         with pytest.raises(ValueError):
             main()
 
 
 def test_corrupt_checkpoint_raises(kaggle_dir):
-    with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_with_model), \
-         patch("main.torch.load", return_value={"bad": "state"}):
+    with patch("ultrasound_tumor_detection.data.kagglehub.dataset_download", return_value=kaggle_dir), \
+         patch("ultrasound_tumor_detection.pipeline.os.path.exists", side_effect=_fake_exists_with_model), \
+         patch("ultrasound_tumor_detection.pipeline.torch.load", return_value={"bad": "state"}):
 
         with pytest.raises(RuntimeError):
             main()

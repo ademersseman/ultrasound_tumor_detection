@@ -3,17 +3,19 @@ Configures mock dataset for unit testing.
 """
 
 import os
-import sys
 import shutil
+import sys
 import tempfile
 
 import cv2
 import numpy as np
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(ROOT_DIR, "src"))
 
-from main import BUSIDataset, UNet
+from ultrasound_tumor_detection.data import BUSIDataset
+from ultrasound_tumor_detection.model import UNet
 
 def make_fake_dataset(root: str, n_per_class: int = 2) -> None:
     for cls in ["benign", "malignant", "normal"]:
