@@ -71,4 +71,4 @@ class UNet(nn.Module):
             raise RuntimeError("Shape mismatch in skip connection (d1, e1)")
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
-        return torch.sigmoid(self.final(d1))
+        return self.final(d1)
