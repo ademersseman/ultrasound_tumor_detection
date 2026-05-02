@@ -257,54 +257,6 @@ After command-line evaluation, the pipeline can display prediction figures with 
 
 Use `--no-show` to skip plotting in non-interactive runs.
 
-## Python API
-
-Use the model directly:
-
-```python
-from ultrasound_tumor_detection import UNet
-
-model = UNet()
-```
-
-Load a BUSI-formatted dataset:
-
-```python
-from ultrasound_tumor_detection.data import BUSIDataset
-
-dataset = BUSIDataset("Dataset_BUSI_with_GT")
-```
-
-Download and load the standard Kaggle dataset:
-
-```python
-from ultrasound_tumor_detection.data import BUSIDataset, download_busi_dataset
-
-data_dir = download_busi_dataset()
-dataset = BUSIDataset(data_dir)
-```
-
-Use the loss and metric:
-
-```python
-from ultrasound_tumor_detection.losses import bce_dice_loss, dice_score
-
-loss = bce_dice_loss(predictions, masks)
-score = dice_score(predictions, masks)
-```
-
-Run the pipeline from Python:
-
-```python
-from ultrasound_tumor_detection.pipeline import run_pipeline
-
-run_pipeline(
-    data_dir="Dataset_BUSI_with_GT",
-    model_path="models/unet_model.pth",
-    epochs=10,
-)
-```
-
 ## Tests
 
 Run the test suite:
