@@ -127,7 +127,7 @@ class ImageAnalysisTab(QWidget):
         right_layout.addWidget(self.heatmap_canvas, alignment=Qt.AlignHCenter)
 
         layout.addLayout(left_layout, 1)
-        layout.addLayout(right_layout, 2.5)        
+        layout.addLayout(right_layout, 2)
         self.setLayout(layout)
 
         self.display_image()
