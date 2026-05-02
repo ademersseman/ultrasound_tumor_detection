@@ -3,7 +3,9 @@
 import argparse
 
 from ultrasound_tumor_detection.pipeline import MODEL_PATH, run_pipeline
-
+from ultrasound_tumor_detection.__main__ import UltrasoundGUI
+from PyQt5.QtWidgets import QApplication
+import sys
 
 def _parser(description):
     parser = argparse.ArgumentParser(description=description)
@@ -41,3 +43,11 @@ def evaluate(argv=None):
         batch_size=args.batch_size,
         show_predictions=not args.no_show,
     )
+
+
+def gui(argv=None):
+    # Create and run the GUI
+    app = QApplication(sys.argv)
+    gui_window = UltrasoundGUI()
+    gui_window.show()
+    sys.exit(app.exec_())
