@@ -14,7 +14,8 @@ import pytest
 import torch
 
 import ultrasound_tumor_detection.pipeline as main_module
-from ultrasound_tumor_detection.pipeline import MODEL_PATH, main
+from ultrasound_tumor_detection.pipeline import MODEL_PATH, load_checkpoint, main
+from ultrasound_tumor_detection.model import UNet
 
 
 # -------------------------
@@ -220,3 +221,64 @@ def test_corrupt_checkpoint_raises(kaggle_dir):
 
         with pytest.raises(RuntimeError):
             main()
+
+
+# -------------------------
+# load_checkpoint unit tests
+# -------------------------
+
+class TestLoadCheckpoint:
+    def test_loads_local_checkpoint_when_present(self, tmp_path):
+        model = UNet()
+        ckpt_path = tmp_path / "model.pth"
+        torch.save(model.state_dict(), ckpt_path)
+
+        fresh = UNet()
+        result = load_checkpoint(fresh, torch.device("cpu"), model_path=str(ckpt_path))
+        assert result is True
+
+    def test_returns_false_when_no_local_and_bundled_disallowed(self, tmp_path):
+        model = UNet()
+        missing = str(tmp_path / "nonexistent.pth")
+        result = load_checkpoint(model, torch.device("cpu"), model_path=missing, allow_bundled=False)
+        assert result is False
+
+    def test_returns_false_when_nothing_exists(self, tmp_path):
+        model = UNet()
+        missing = str(tmp_path / "nonexistent.pth")
+        with patch("ultrasound_tumor_detection.pipeline.bundled_model_resource") as mock_res:
+            mock_res.return_value.is_file.return_value = False
+            result = load_checkpoint(model, torch.device("cpu"), model_path=missing, allow_bundled=True)
+        assert result is False
+
+    def test_loads_bundled_when_no_local(self, tmp_path):
+        model = UNet()
+        state = model.state_dict()
+        bundled_file = tmp_path / "bundled.pth"
+        torch.save(state, bundled_file)
+
+        missing = str(tmp_path / "nonexistent.pth")
+        with patch("ultrasound_tumor_detection.pipeline.bundled_model_resource") as mock_res:
+            mock_res.return_value.is_file.return_value = True
+            mock_res.return_value.__enter__ = lambda s: None
+            mock_res.return_value.__exit__ = lambda s, *a: None
+            with patch("ultrasound_tumor_detection.pipeline.as_file") as mock_as_file, \
+                 patch("ultrasound_tumor_detection.pipeline.torch.load", return_value=state) as mock_tload:
+                mock_as_file.return_value.__enter__ = lambda s: bundled_file
+                mock_as_file.return_value.__exit__ = lambda s, *a: None
+                result = load_checkpoint(model, torch.device("cpu"), model_path=missing, allow_bundled=True)
+
+        assert result is True
+
+    def test_local_checkpoint_updates_model_weights(self, tmp_path):
+        source = UNet().eval()
+        ckpt_path = tmp_path / "model.pth"
+        torch.save(source.state_dict(), ckpt_path)
+
+        target = UNet()
+        load_checkpoint(target, torch.device("cpu"), model_path=str(ckpt_path))
+        target.eval()
+
+        x = torch.rand(1, 1, 64, 64)
+        with torch.no_grad():
+            assert torch.allclose(source(x), target(x))

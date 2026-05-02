@@ -68,14 +68,26 @@ class TestUNetArchitecture:
         assert out.shape == x.shape
         assert torch.isfinite(out).all()
 
-    # invalid spatial size should fail 
+    # invalid spatial size should fail
     def test_invalid_resolution_raises(self):
         m = UNet().eval()
-        x = torch.rand(1, 1, 250, 250) 
+        x = torch.rand(1, 1, 250, 250)
 
         with pytest.raises(RuntimeError):
             _ = m(x)
-    
+
+    def test_non_4d_input_raises_value_error(self):
+        m = UNet().eval()
+        x = torch.rand(1, 256, 256)  # 3D, missing batch dim
+        with pytest.raises(ValueError, match="4D"):
+            m(x)
+
+    def test_wrong_channel_count_raises_value_error(self):
+        m = UNet().eval()
+        x = torch.rand(1, 3, 256, 256)  # RGB instead of greyscale
+        with pytest.raises(ValueError, match="1 input channel"):
+            m(x)
+
     # eval mode should lead to deterministic outputs
     def test_eval_mode_deterministic(self):
         m = UNet().eval()
