@@ -271,11 +271,8 @@ With coverage:
 pytest --cov=ultrasound_tumor_detection
 ```
 
-The tests cover dataset parsing and filtering, model shape/input validation and persistence, loss/metric behavior, training mechanics, pipeline behavior, and visualization helpers.
+The tests cover dataset parsing and filtering, model shape/input validation and persistence, loss/metric behavior, training mechanics, pipeline behavior, and visualization/gui helpers.
 
-## GUI Test Plan
-
-GUI tests are not currently implemented in the checked-in test suite. Useful future coverage would include startup with and without a local or bundled checkpoint, single/multiple image loading, tab closing and clearing, confidence metric clamping, raw/heatmap canvas rendering, zoom/reset behavior, panning while zoomed, and the preprocessing contract that sends a `(1, 1, 256, 256)` `float32` tensor to the model. Qt widget tests would need a tool such as `pytest-qt`.
 
 ## AI Disclosure
 
