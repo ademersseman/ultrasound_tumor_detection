@@ -6,6 +6,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch.nn as nn
+import torch.nn.functional as F
+
+
+EPOCHS = 10
+MODEL_PATH = "unet_model.pth"
 
 
 class BUSIDataset(Dataset):
@@ -18,6 +23,8 @@ class BUSIDataset(Dataset):
 
         for cls in ["benign", "malignant", "normal"]:
             folder = os.path.join(root_dir, cls)
+            if not os.path.isdir(folder):
+                continue
 
             for file in os.listdir(folder):
                 if "_mask" in file:
@@ -149,8 +156,7 @@ class UNet(nn.Module):
             raise RuntimeError("Shape mismatch in skip connection (d1, e1)")
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
-        # return torch.sigmoid(self.final(d1))
-        return self.final(d1)
+        return torch.sigmoid(self.final(d1))
 
 
 def bce_dice_loss(pred, target, smooth=1):
@@ -160,10 +166,10 @@ def bce_dice_loss(pred, target, smooth=1):
     if pred.numel() == 0:
         raise ValueError("Empty tensors passed to loss")
 
-    bce = nn.BCEWithLogitsLoss()(pred, target)
-    pred_prob = torch.sigmoid(pred)
-    intersection = (pred_prob * target).sum()
-    dice = 1 - (2 * intersection + smooth) / (pred_prob.sum() + target.sum() + smooth)
+    pred = pred.clamp(1e-7, 1 - 1e-7)
+    bce = F.binary_cross_entropy(pred, target)
+    intersection = (pred * target).sum()
+    dice = 1 - (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
     
     return bce + dice
 
@@ -175,7 +181,7 @@ def dice_score(pred, target, smooth=1, threshold = 0.65):
     if pred.numel() == 0:
         raise ValueError("Empty tensors")
 
-    pred = (torch.sigmoid(pred) > threshold).float()  # add sigmoid
+    pred = (pred > threshold).float()
     target = (target > threshold).float()
     intersection = (pred * target).sum()
     return (2 * intersection + smooth) / (pred.sum() + target.sum() + smooth)
@@ -200,8 +206,6 @@ def visualize_predictions(imgs, masks, preds, threshold=0.65):
         plt.show()
 
 def main():
-    EPOCHS = 10
-
     path = kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset")
     data_dir = os.path.join(path, "Dataset_BUSI_with_GT")
 
@@ -220,9 +224,9 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = UNet().to(device)
 
-    MODEL_PATH = "unet_model.pth"
     if os.path.exists(MODEL_PATH):
-        model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+        checkpoint = torch.load(MODEL_PATH, map_location=device)
+        model.load_state_dict(checkpoint)
         print("Loaded saved model!")
         train_model = False
     else:

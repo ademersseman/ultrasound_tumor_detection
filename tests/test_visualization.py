@@ -232,4 +232,3 @@ def test_sigmoid_applied_not_raw_logits():
     pred_data = mock_plt.imshow.call_args_list[2].args[0]
     assert pred_data.dtype == torch.bool
 
-

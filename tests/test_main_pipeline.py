@@ -238,7 +238,7 @@ def test_dataset_failure_raises(kaggle_dir):
 
 def test_corrupt_checkpoint_raises(kaggle_dir):
     with patch("main.kagglehub.dataset_download", return_value=kaggle_dir), \
-         patch("main.os.path.exists", side_effect=_fake_exists_no_model), \
+         patch("main.os.path.exists", side_effect=_fake_exists_with_model), \
          patch("main.torch.load", return_value={"bad": "state"}):
 
         with pytest.raises(RuntimeError):
