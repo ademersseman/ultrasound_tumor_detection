@@ -15,23 +15,25 @@ At inference time, raw model logits are converted to probabilities with `sigmoid
 ```text
 .
 ├── Dataset_BUSI_with_GT/              # BUSI data in source checkout, when present
+├── models/                            # optional user-trained checkpoints
 ├── scripts/                           # thin wrappers around package CLI functions
 ├── src/ultrasound_tumor_detection/
 │   ├── __init__.py                    # public imports
 │   ├── __main__.py                    # PyQt5 GUI application
+│   ├── assets/
+│   │   └── unet_model.pth             # bundled pretrained checkpoint
 │   ├── cli.py                         # utd-run, utd-train, utd-evaluate
 │   ├── data.py                        # BUSI download/loading
 │   ├── losses.py                      # BCE + Dice loss and Dice score
 │   ├── model.py                       # U-Net architecture
 │   ├── pipeline.py                    # train/evaluate/full pipeline functions
-│   ├── visualization.py               # prediction plotting helpers
-│   └── unet_model.pth                 # GUI default checkpoint in this checkout
+│   └── visualization.py               # prediction plotting helpers
 ├── tests/                             # pytest suite
 ├── pyproject.toml                     # package metadata and install config
 └── README.md
 ```
 
-Large local artifacts such as generated model checkpoints, coverage reports, and Python caches are ignored by git.
+Large local artifacts such as user-trained model checkpoints, coverage reports, and Python caches are ignored by git.
 
 ## Architecture
 
@@ -135,7 +137,17 @@ Run the full download, train-or-load, evaluate, and visualization flow:
 utd-run
 ```
 
-By default, this downloads the Kaggle BUSI dataset when `--data-dir` is omitted, saves CLI-trained model weights to `models/unet_model.pth`, evaluates on a held-out split, and shows prediction plots.
+Checkpoint behavior depends on whether you use the default model path or pass your own `--model-path`:
+
+| Command state | What happens |
+| --- | --- |
+| Default path `models/unet_model.pth` exists | Load that local/user checkpoint and skip training. |
+| Default path is missing, bundled `assets/unet_model.pth` exists | Load the bundled pretrained checkpoint and skip training. |
+| Default path and bundled checkpoint are both missing | Train from scratch and save to `models/unet_model.pth`. |
+| Custom `--model-path` exists | Load that custom checkpoint and skip training. |
+| Custom `--model-path` is missing | Train from scratch and save to that custom path. The bundled checkpoint is not used for custom missing paths. |
+
+This means the default command prefers a user-trained local model, then falls back to the bundled pretrained model. To force new training, pass a new custom `--model-path` or remove/rename the existing local checkpoint you want to replace.
 
 Useful options:
 
@@ -150,6 +162,12 @@ Train/evaluate entry points are thin wrappers around the same pipeline:
 ```bash
 utd-train --data-dir Dataset_BUSI_with_GT --epochs 10 --model-path models/unet_model.pth
 utd-evaluate --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth --no-show
+```
+
+To train your own checkpoint without replacing the default local model path, choose another path that does not already exist:
+
+```bash
+utd-run --data-dir Dataset_BUSI_with_GT --epochs 10 --model-path models/my_unet_model.pth
 ```
 
 The source-checkout script wrappers are also available:
@@ -168,13 +186,14 @@ The GUI is implemented inside the package as `src/ultrasound_tumor_detection/__m
 python -m ultrasound_tumor_detection
 ```
 
-The GUI is a PyQt5 desktop app titled `Ultrasound Tumor Detection - Multi-Image Analysis`. It loads a `UNet`, runs on CUDA when available, and looks for its default checkpoint next to `__main__.py`:
+The GUI is a PyQt5 desktop app titled `Ultrasound Tumor Detection - Multi-Image Analysis`. It loads a `UNet`, runs on CUDA when available, and uses the default checkpoint resolution:
 
 ```text
-src/ultrasound_tumor_detection/unet_model.pth
+1. models/unet_model.pth
+2. bundled assets/unet_model.pth
 ```
 
-If that file is missing, the GUI prints a warning and runs with an untrained model. Note that the CLI pipeline default is `models/unet_model.pth`, while the GUI default is package-local `unet_model.pth`; to use newly trained CLI weights in the GUI, place the desired checkpoint at the GUI path or update `MODEL_PATH` in `__main__.py`.
+The package includes the pretrained model as package data, so the GUI can be used immediately after installing the GUI extra. If both the local and bundled checkpoints are missing, the GUI prints a warning and runs with an untrained model. To use your own trained model in the GUI, save it to `models/unet_model.pth`.
 
 GUI features:
 
@@ -296,7 +315,7 @@ The tests cover dataset parsing and filtering, model shape/input validation and 
 
 ## GUI Test Plan
 
-GUI tests are not currently implemented in the checked-in test suite. Useful future coverage would include startup with and without `unet_model.pth`, single/multiple image loading, tab closing and clearing, confidence metric clamping, raw/heatmap canvas rendering, zoom/reset behavior, panning while zoomed, and the preprocessing contract that sends a `(1, 1, 256, 256)` `float32` tensor to the model. Qt widget tests would need a tool such as `pytest-qt`.
+GUI tests are not currently implemented in the checked-in test suite. Useful future coverage would include startup with and without a local or bundled checkpoint, single/multiple image loading, tab closing and clearing, confidence metric clamping, raw/heatmap canvas rendering, zoom/reset behavior, panning while zoomed, and the preprocessing contract that sends a `(1, 1, 256, 256)` `float32` tensor to the model. Qt widget tests would need a tool such as `pytest-qt`.
 
 ## AI Disclosure
 

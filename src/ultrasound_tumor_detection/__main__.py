@@ -16,8 +16,8 @@ from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector
 
 from ultrasound_tumor_detection import UNet
+from ultrasound_tumor_detection.pipeline import MODEL_PATH, load_checkpoint
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "unet_model.pth")
 
 class ImageAnalysisTab(QWidget):
     def __init__(self, model, device, image_data, tab_index, parent=None):
@@ -353,10 +353,7 @@ class UltrasoundGUI(QMainWindow):
         self.device = device
         self.model = UNet().to(self.device)
         
-        if os.path.exists(MODEL_PATH):
-            self.model.load_state_dict(torch.load(MODEL_PATH, map_location=self.device))
-            print("Model loaded successfully!")
-        else:
+        if not load_checkpoint(self.model, self.device, model_path=MODEL_PATH):
             print("Warning: Model file not found. Using untrained model.")
         
         self.model.eval()

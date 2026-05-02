@@ -1,6 +1,8 @@
 """Training, evaluation, and full-pipeline orchestration."""
 
 import os
+from importlib.resources import as_file, files
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -13,6 +15,35 @@ from ultrasound_tumor_detection.visualization import visualize_predictions
 
 EPOCHS = 10
 MODEL_PATH = "models/unet_model.pth"
+BUNDLED_MODEL_PATH = "assets/unet_model.pth"
+
+
+def bundled_model_resource():
+    return files("ultrasound_tumor_detection").joinpath(BUNDLED_MODEL_PATH)
+
+
+def load_checkpoint(model, device, model_path=MODEL_PATH, allow_bundled=True):
+    """Load a user checkpoint when present, otherwise fall back to the bundled model."""
+    local_model_path = Path(model_path)
+
+    if local_model_path.exists():
+        checkpoint = torch.load(local_model_path, map_location=device)
+        model.load_state_dict(checkpoint)
+        print(f"Loaded saved model from {local_model_path}!")
+        return True
+
+    if not allow_bundled:
+        return False
+
+    bundled_model = bundled_model_resource()
+    if bundled_model.is_file():
+        with as_file(bundled_model) as checkpoint_path:
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+        model.load_state_dict(checkpoint)
+        print(f"Loaded bundled pretrained model from {BUNDLED_MODEL_PATH}!")
+        return True
+
+    return False
 
 
 def train_model(model, train_loader, optimizer, device, epochs=EPOCHS):
@@ -76,14 +107,14 @@ def run_pipeline(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = UNet().to(device)
 
-    if os.path.exists(model_path):
-        checkpoint = torch.load(model_path, map_location=device)
-        model.load_state_dict(checkpoint)
-        print("Loaded saved model!")
-        should_train = False
-    else:
-        print("No saved model found. Training from scratch...")
-        should_train = True
+    should_train = not load_checkpoint(
+        model,
+        device,
+        model_path=model_path,
+        allow_bundled=os.fspath(model_path) == MODEL_PATH,
+    )
+    if should_train:
+        print("No saved or bundled model found. Training from scratch...")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
