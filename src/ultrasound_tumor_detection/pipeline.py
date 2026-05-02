@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader, random_split
 from ultrasound_tumor_detection.data import BUSIDataset, download_busi_dataset
 from ultrasound_tumor_detection.losses import bce_dice_loss, dice_score
 from ultrasound_tumor_detection.model import UNet
-from ultrasound_tumor_detection.visualization import visualize_predictions
 
 
 EPOCHS = 10
@@ -96,7 +95,6 @@ def run_pipeline(
     model_path=MODEL_PATH,
     epochs=None,
     batch_size=8,
-    show_predictions=True,
 ):
     if data_dir is None:
         data_dir = download_busi_dataset()
@@ -126,15 +124,6 @@ def run_pipeline(
 
     average_dice = evaluate_model(model, test_loader, device)
     print("Average Dice Score:", average_dice)
-
-    if show_predictions:
-        imgs, masks = next(iter(test_loader))
-        imgs = imgs.to(device)
-
-        with torch.no_grad():
-            preds = model(imgs)
-
-        visualize_predictions(imgs.cpu(), masks.cpu(), preds.cpu())
 
     return average_dice
 

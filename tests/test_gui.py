@@ -1,6 +1,6 @@
 """
 Tests the GUI widgets in __main__.py — widget state, confidence metrics,
-zoom/pan interactions, image loading, and tab management.
+zoom/pan interactions, image loading, tab management.
 """
 
 import sys
@@ -72,7 +72,7 @@ def gui(qapp):
 
 
 # -------------------------
-# ImageAnalysisTab — widget creation
+# ImageAnalysisTab widget creation
 # -------------------------
 
 class TestImageAnalysisTabWidgets:
@@ -121,7 +121,7 @@ class TestImageAnalysisTabWidgets:
 
 
 # -------------------------
-# ImageAnalysisTab — predict
+# ImageAnalysisTab prediction
 # -------------------------
 
 class TestPredict:
@@ -150,7 +150,7 @@ class TestPredict:
 
 
 # -------------------------
-# ImageAnalysisTab — update_confidence_metrics
+# ImageAnalysisTab -- update_confidence_metrics
 # -------------------------
 
 class TestConfidenceMetrics:
@@ -212,7 +212,7 @@ class TestConfidenceMetrics:
 
 
 # -------------------------
-# ImageAnalysisTab — zoom region
+# ImageAnalysisTab — zooming
 # -------------------------
 
 class TestZoomRegion:
@@ -370,14 +370,15 @@ class TestUltrasoundGUIInitialState:
     def test_window_title_identifies_application(self, gui):
         assert "Ultrasound Tumor Detection" in gui.windowTitle()
 
-    def test_images_list_is_empty(self, gui):
-        assert gui.images == []
+    def test_sample_image_preloaded_on_startup(self, gui):
+        assert len(gui.images) == 1
+        assert gui.images[0]['name'] == 'sample_image.png'
 
-    def test_count_label_shows_zero(self, gui):
-        assert "0" in gui.image_count_label.text()
+    def test_count_label_shows_one_after_preload(self, gui):
+        assert "1" in gui.image_count_label.text()
 
-    def test_no_tabs_on_startup(self, gui):
-        assert gui.tabs.count() == 0
+    def test_one_tab_preloaded_on_startup(self, gui):
+        assert gui.tabs.count() == 1
 
     def test_tabs_have_close_buttons(self, gui):
         assert gui.tabs.tabsClosable()
@@ -394,25 +395,28 @@ class TestAddImage:
                patch('ultrasound_tumor_detection.__main__.cv2.resize', return_value=fake)
 
     def test_add_image_appends_to_images_list(self, gui):
+        before = len(gui.images)
         fake = np.zeros((256, 256), dtype=np.uint8)
         rd, rz = self._patch_cv2(fake)
         with rd, rz:
             gui.add_image('/fake/img.png')
-        assert len(gui.images) == 1
+        assert len(gui.images) == before + 1
 
     def test_add_image_creates_one_tab(self, gui):
+        before = gui.tabs.count()
         fake = np.zeros((256, 256), dtype=np.uint8)
         rd, rz = self._patch_cv2(fake)
         with rd, rz:
             gui.add_image('/fake/img.png')
-        assert gui.tabs.count() == 1
+        assert gui.tabs.count() == before + 1
 
     def test_add_image_updates_count_label(self, gui):
+        before = len(gui.images)
         fake = np.zeros((256, 256), dtype=np.uint8)
         rd, rz = self._patch_cv2(fake)
         with rd, rz:
             gui.add_image('/fake/img.png')
-        assert "1" in gui.image_count_label.text()
+        assert str(before + 1) in gui.image_count_label.text()
 
     def test_add_image_stores_basename(self, gui):
         fake = np.zeros((256, 256), dtype=np.uint8)
@@ -422,13 +426,14 @@ class TestAddImage:
         assert gui.images[-1]['name'] == 'scan.png'
 
     def test_add_multiple_images_each_gets_tab(self, gui):
+        before = gui.tabs.count()
         fake = np.zeros((256, 256), dtype=np.uint8)
         rd, rz = self._patch_cv2(fake)
         with rd, rz:
             gui.add_image('/fake/a.png')
             gui.add_image('/fake/b.png')
-        assert len(gui.images) == 2
-        assert gui.tabs.count() == 2
+        assert len(gui.images) == before + 2
+        assert gui.tabs.count() == before + 2
 
     def test_add_image_error_does_not_raise(self, gui):
         with patch('ultrasound_tumor_detection.__main__.cv2.imread', side_effect=Exception("I/O error")):
@@ -461,14 +466,17 @@ class TestCloseTab:
 
     def test_close_tab_updates_count_label(self, gui):
         self._setup(gui)
+        before = len(gui.images)
         gui.close_tab(0)
-        assert "1" in gui.image_count_label.text()
+        assert str(before - 1) in gui.image_count_label.text()
 
-    def test_close_last_tab_empties_gui(self, gui):
+    def test_clear_then_close_last_tab_empties_gui(self, gui):
+        gui.clear_all()
         fake = np.zeros((256, 256), dtype=np.uint8)
         with patch('ultrasound_tumor_detection.__main__.cv2.imread', return_value=fake), \
              patch('ultrasound_tumor_detection.__main__.cv2.resize', return_value=fake):
             gui.add_image('/fake/only.png')
+        assert gui.tabs.count() == 1
         gui.close_tab(0)
         assert len(gui.images) == 0
         assert gui.tabs.count() == 0
@@ -501,8 +509,9 @@ class TestClearAll:
         gui.clear_all()
         assert "0" in gui.image_count_label.text()
 
-    def test_clear_all_on_empty_gui_is_safe(self, gui):
-        gui.clear_all()  # must not raise
+    def test_clear_all_is_idempotent(self, gui):
+        gui.clear_all()
+        gui.clear_all()  # second call must not raise
         assert gui.images == []
 
 
@@ -512,31 +521,35 @@ class TestClearAll:
 
 class TestFileDialogs:
     def test_load_image_adds_image_when_file_selected(self, gui):
+        before = len(gui.images)
         fake = np.zeros((256, 256), dtype=np.uint8)
         with patch('ultrasound_tumor_detection.__main__.QFileDialog') as mock_dlg, \
              patch('ultrasound_tumor_detection.__main__.cv2.imread', return_value=fake), \
              patch('ultrasound_tumor_detection.__main__.cv2.resize', return_value=fake):
             mock_dlg.getOpenFileName.return_value = ('/fake/img.png', '')
             gui.load_image()
-        assert len(gui.images) == 1
+        assert len(gui.images) == before + 1
 
     def test_load_image_no_op_when_dialog_cancelled(self, gui):
+        before = len(gui.images)
         with patch('ultrasound_tumor_detection.__main__.QFileDialog') as mock_dlg:
             mock_dlg.getOpenFileName.return_value = ('', '')
             gui.load_image()
-        assert len(gui.images) == 0
+        assert len(gui.images) == before
 
     def test_load_multiple_images_adds_each_selected_file(self, gui):
+        before = len(gui.images)
         fake = np.zeros((256, 256), dtype=np.uint8)
         with patch('ultrasound_tumor_detection.__main__.QFileDialog') as mock_dlg, \
              patch('ultrasound_tumor_detection.__main__.cv2.imread', return_value=fake), \
              patch('ultrasound_tumor_detection.__main__.cv2.resize', return_value=fake):
             mock_dlg.getOpenFileNames.return_value = (['/fake/a.png', '/fake/b.png'], '')
             gui.load_multiple_images()
-        assert len(gui.images) == 2
+        assert len(gui.images) == before + 2
 
     def test_load_multiple_images_no_op_when_cancelled(self, gui):
+        before = len(gui.images)
         with patch('ultrasound_tumor_detection.__main__.QFileDialog') as mock_dlg:
             mock_dlg.getOpenFileNames.return_value = ([], '')
             gui.load_multiple_images()
-        assert len(gui.images) == 0
+        assert len(gui.images) == before

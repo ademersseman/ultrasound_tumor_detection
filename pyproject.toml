@@ -35,4 +35,4 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-ultrasound_tumor_detection = ["assets/*.pth"]
+ultrasound_tumor_detection = ["assets/*.pth", "assets/*.png"]

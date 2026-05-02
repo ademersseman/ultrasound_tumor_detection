@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import cv2
 import torch
 import numpy as np
+from importlib.resources import as_file, files
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget, QFileDialog, QProgressBar, QScrollArea, QTabWidget, QGridLayout
 from PyQt5.QtGui import QPixmap, QImage, QFont, QIcon
 from PyQt5.QtCore import Qt
@@ -193,9 +194,8 @@ class ImageAnalysisTab(QWidget):
         # Preprocess
         img_tensor = torch.tensor(self.image_data['image'] / 255.0).unsqueeze(0).unsqueeze(0).float().to(self.device)
         
-        # Predict (keep raw predictions for heatmap)
         with torch.no_grad():
-            pred_raw = torch.sigmoid(self.model(img_tensor)) 
+            pred_raw = self.model(img_tensor)
         
         self.current_pred_raw = pred_raw.squeeze().cpu().numpy()
                         
@@ -358,8 +358,9 @@ class UltrasoundGUI(QMainWindow):
         
         self.model.eval()
         self.images = []  # Store multiple images
-        
+
         self.initUI()
+        self.load_default_image()
     
     def initUI(self):
         self.setWindowTitle("Ultrasound Tumor Detection - Multi-Image Analysis")
@@ -405,6 +406,14 @@ class UltrasoundGUI(QMainWindow):
         
         main_widget.setLayout(layout)
     
+    def load_default_image(self):
+        bundled = files("ultrasound_tumor_detection").joinpath("assets/sample_image.png")
+        try:
+            with as_file(bundled) as sample_path:
+                self.add_image(str(sample_path))
+        except Exception as e:
+            print(f"Could not load default image: {e}")
+
     def load_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Image Files (*.png *.jpg *.bmp)")
         

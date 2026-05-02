@@ -6,9 +6,9 @@ This code was built for Cornell ORIE5270 coursework.
 
 ## Overview
 
-The model takes a single-channel breast ultrasound image and outputs a one-channel segmentation map. The BUSI dataset classes (`benign`, `malignant`, and `normal`) are used as image categories, but the learning task is binary pixel segmentation: tumor mask versus background. Normal images are expected to have empty/no-tumor masks.
+The model takes a single-channel breast ultrasound image and outputs a one-channel segmentation map with pixel values in `[0, 1]` (sigmoid applied inside the model). The BUSI dataset classes (`benign`, `malignant`, and `normal`) are used as image categories, but the learning task is binary pixel segmentation: tumor mask versus background. Normal images are expected to have empty/no-tumor masks.
 
-At inference time, raw model logits are converted to probabilities with `sigmoid`. The command-line visualization thresholds predictions at `0.65`; the GUI also uses `0.65` for tumor-pixel counting.
+At inference time, pixel probabilities above `0.65` are counted as tumor pixels. The GUI uses the same threshold for tumor-pixel counting and heatmap display.
 
 ## Project Layout
 
@@ -21,13 +21,13 @@ At inference time, raw model logits are converted to probabilities with `sigmoid
 │   ├── __init__.py                    # public imports
 │   ├── __main__.py                    # PyQt5 GUI application
 │   ├── assets/
-│   │   └── unet_model.pth             # bundled pretrained checkpoint
-│   ├── cli.py                         # utd-run, utd-train, utd-evaluate
+│   │   ├── unet_model.pth             # bundled pretrained checkpoint
+│   │   └── sample_image.png           # default image loaded on GUI startup
+│   ├── cli.py                         # utd-run, utd-train, utd-evaluate, utd-gui
 │   ├── data.py                        # BUSI download/loading
 │   ├── losses.py                      # BCE + Dice loss and Dice score
 │   ├── model.py                       # U-Net architecture
-│   ├── pipeline.py                    # train/evaluate/full pipeline functions
-│   └── visualization.py               # prediction plotting helpers
+│   └── pipeline.py                    # train/evaluate/full pipeline functions
 ├── tests/                             # pytest suite
 ├── pyproject.toml                     # package metadata and install config
 └── README.md
@@ -53,12 +53,12 @@ Input (B, 1, H, W), where H and W are divisible by 8
         up3 + dec3: ConvTranspose + Conv block 512 -> 256
         up2 + dec2: ConvTranspose + Conv block 256 -> 128
         up1 + dec1: ConvTranspose + Conv block 128 -> 64
-        final: Conv 64 -> 1
+        final: Conv 64 -> 1 + Sigmoid
 
-Output (B, 1, H, W) raw logits
+Output (B, 1, H, W) probabilities in [0, 1]
 ```
 
-Each convolution block is two `Conv2d + BatchNorm2d + ReLU` layers. The model returns raw logits; `sigmoid` is applied by the loss, metric, visualization, and GUI inference code as needed.
+Each convolution block is two `Conv2d + BatchNorm2d + ReLU` layers. Sigmoid is applied inside `forward()` as the final step, so the model always outputs probabilities — no external sigmoid is needed.
 
 `UNet.forward()` validates its input and raises:
 
@@ -131,7 +131,7 @@ If you want the pipeline to download BUSI automatically, configure Kaggle creden
 
 ## Command-Line Usage
 
-Run the full download, train-or-load, evaluate, and visualization flow:
+Run the full download, train-or-load, and evaluate flow:
 
 ```bash
 utd-run
@@ -154,14 +154,13 @@ Useful options:
 ```bash
 utd-run --epochs 10
 utd-run --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth
-utd-run --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth --no-show
 ```
 
 Train/evaluate entry points are thin wrappers around the same pipeline:
 
 ```bash
 utd-train --data-dir Dataset_BUSI_with_GT --epochs 10 --model-path models/unet_model.pth
-utd-evaluate --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth --no-show
+utd-evaluate --data-dir Dataset_BUSI_with_GT --model-path models/unet_model.pth
 ```
 
 To train your own checkpoint without replacing the default local model path, choose another path that does not already exist:
@@ -175,15 +174,21 @@ The source-checkout script wrappers are also available:
 ```bash
 python scripts/run_pipeline.py --data-dir Dataset_BUSI_with_GT
 python scripts/train_model.py --data-dir Dataset_BUSI_with_GT
-python scripts/evaluate_model.py --data-dir Dataset_BUSI_with_GT --no-show
+python scripts/evaluate_model.py --data-dir Dataset_BUSI_with_GT
 ```
 
 ## GUI Usage
 
-The GUI is implemented inside the package as `src/ultrasound_tumor_detection/__main__.py`, not as a top-level `gui.py`. After installing the GUI extra, launch it with:
+Launch the desktop GUI with:
 
 ```bash
 python -m ultrasound_tumor_detection
+```
+
+or via the CLI entry point:
+
+```bash
+utd-gui
 ```
 
 The GUI is a PyQt5 desktop app titled `Ultrasound Tumor Detection - Multi-Image Analysis`. It loads a `UNet`, runs on CUDA when available, and uses the default checkpoint resolution:
@@ -195,18 +200,19 @@ The GUI is a PyQt5 desktop app titled `Ultrasound Tumor Detection - Multi-Image 
 
 The package includes the pretrained model as package data, so the GUI can be used immediately after installing the GUI extra. If both the local and bundled checkpoints are missing, the GUI prints a warning and runs with an untrained model. To use your own trained model in the GUI, save it to `models/unet_model.pth`.
 
+On startup, the GUI automatically loads a bundled `sample_image.png` so there is always something to view.
+
 GUI features:
 
 - Load one image or multiple PNG/JPG/BMP images.
 - Open each loaded image in a closeable tab.
-- Resize each image to `256 x 256`, normalize to `[0, 1]`, and run model inference.
-- Show the raw grayscale image and probability heatmap with a `hot` colormap.
-- Display tumor status, confidence, tumor pixel count, coverage percentage, and max model confidence.
-- Use rectangle selection to zoom raw image and heatmap together.
-- Pan both views while zoomed.
-- Reset zoom per image, close tabs, or clear all loaded images.
+- Resize each image to `256 x 256`, normalize to `[0, 1]`, and run model inference immediately.
+- Show the raw grayscale image and a probability heatmap side-by-side with a `hot` colormap and colorbar.
+- Display tumor status, confidence bar, tumor pixel count, coverage percentage, and max model confidence.
+- Draw a rectangle to zoom the raw image and heatmap together; left-click-drag to pan while zoomed.
+- Reset zoom per image, close individual tabs, or clear all loaded images.
 
-The GUI tumor status currently counts pixels with probability greater than `0.65`; more than `1000` tumor pixels is reported as detected.
+The GUI tumor status counts pixels with probability greater than `0.65`; more than `1000` such pixels is reported as detected.
 
 GUI layout:
 
@@ -225,29 +231,16 @@ Per tab:      left metrics/control panel + right raw-image and heatmap canvases
 | Batch size | 8 by default |
 | Optimizer | Adam, `lr=1e-4` |
 | Epochs | 10 by default |
-| Loss | BCE with logits + Dice loss |
-| Prediction threshold | 0.65 for visualized/GUI masks |
+| Loss | BCE + Dice loss (on sigmoid probabilities) |
+| Prediction threshold | 0.65 for masks and GUI counting |
 
-Loss:
+Loss (both terms operate on probabilities, since sigmoid is in the model):
 
 ```text
-loss = BCEWithLogits(pred_logits, target_mask)
-     + (1 - Dice(sigmoid(pred_logits), target_mask))
+loss = BCE(pred_probs, target_mask) + (1 - Dice(pred_probs, target_mask))
 ```
 
 The evaluation metric is average Dice score on the held-out test loader.
-
-## Output
-
-After command-line evaluation, the pipeline can display prediction figures with three panels:
-
-| Panel | Content |
-| --- | --- |
-| Left | Original ultrasound image |
-| Center | Ground-truth mask |
-| Right | Predicted mask after `sigmoid` and threshold `0.65` |
-
-Use `--no-show` to skip plotting in non-interactive runs.
 
 ## Python API
 
@@ -257,6 +250,7 @@ Use the model directly:
 from ultrasound_tumor_detection import UNet
 
 model = UNet()
+# model(x) returns probabilities in [0, 1] — no external sigmoid needed
 ```
 
 Load a BUSI-formatted dataset:
@@ -311,11 +305,7 @@ With coverage:
 pytest --cov=ultrasound_tumor_detection
 ```
 
-The tests cover dataset parsing and filtering, model shape/input validation and persistence, loss/metric behavior, training mechanics, pipeline behavior, and visualization helpers.
-
-## GUI Test Plan
-
-GUI tests are not currently implemented in the checked-in test suite. Useful future coverage would include startup with and without a local or bundled checkpoint, single/multiple image loading, tab closing and clearing, confidence metric clamping, raw/heatmap canvas rendering, zoom/reset behavior, panning while zoomed, and the preprocessing contract that sends a `(1, 1, 256, 256)` `float32` tensor to the model. Qt widget tests would need a tool such as `pytest-qt`.
+The tests cover dataset parsing and filtering, model shape/input validation and persistence, loss/metric behavior, training mechanics, pipeline behavior, and GUI widget state, inference logic, zoom/pan interactions, and tab management.
 
 ## AI Disclosure
 

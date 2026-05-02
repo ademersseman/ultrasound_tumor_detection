@@ -13,19 +13,17 @@ def _parser(description):
     parser.add_argument("--model-path", default=MODEL_PATH, help="Path to model checkpoint.")
     parser.add_argument("--epochs", type=int, default=None, help="Number of training epochs when no checkpoint exists.")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size for dataloaders.")
-    parser.add_argument("--no-show", action="store_true", help="Skip prediction plots.")
     return parser
 
 
 def run(argv=None):
-    parser = _parser("Run the BUSI download/train/evaluate/visualize pipeline.")
+    parser = _parser("Run the BUSI download/train/evaluate pipeline.")
     args = parser.parse_args(argv)
     run_pipeline(
         data_dir=args.data_dir,
         model_path=args.model_path,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        show_predictions=not args.no_show,
     )
 
 
@@ -41,7 +39,6 @@ def evaluate(argv=None):
         model_path=args.model_path,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        show_predictions=not args.no_show,
     )
 
 
