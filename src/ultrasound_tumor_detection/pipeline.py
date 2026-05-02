@@ -113,6 +113,7 @@ def run_pipeline(
         model_path=model_path,
         allow_bundled=os.fspath(model_path) == MODEL_PATH,
     )
+
     if should_train:
         print("No saved or bundled model found. Training from scratch...")
 
@@ -124,6 +125,7 @@ def run_pipeline(
         torch.save(model.state_dict(), model_path)
         print("Model saved!")
 
+    print("Evaluating... (This could take a while!)")
     average_dice = evaluate_model(model, test_loader, device)
     print("Average Dice Score:", average_dice)
 

@@ -203,14 +203,11 @@ The package includes the pretrained model as package data, so the GUI can be use
 
 GUI features:
 
-- Load one image or multiple PNG/JPG/BMP images.
-- Open each loaded image in a closeable tab.
-- Resize each image to `256 x 256`, normalize to `[0, 1]`, and run model inference.
+- Accept user image upload.
+- Resize image to `256 x 256`, normalize to `[0, 1]`, and run model inference.
 - Show the raw grayscale image and probability heatmap with a `hot` colormap.
 - Display tumor status, confidence, tumor pixel count, coverage percentage, and max model confidence.
 - Use rectangle selection to zoom raw image and heatmap together.
-- Pan both views while zoomed.
-- Reset zoom per image, close tabs, or clear all loaded images.
 
 The GUI tumor status currently counts pixels with probability greater than `0.65`; more than `1000` tumor pixels is reported as detected.
 
