@@ -1,14 +1,14 @@
 # Ultrasound Tumor Detection
 
-U-Net segmentation for breast tumor regions in grayscale ultrasound images. The project is packaged under `src/ultrasound_tumor_detection` and provides reusable Python modules, command-line entry points for the BUSI training/evaluation pipeline, and a PyQt5 desktop GUI for interactive inference.
+This project is packaged under `src/ultrasound_tumor_detection` and provides reusable Python modules, command-line entry points for the BUSI training pipeline, and a PyQt5 desktop GUI for interactive inference. This project implements U-Net segmentation for breast tumor regions on grayscale ultrasound images. 
 
-This code was built for Cornell ORIE5270 coursework.
+This project was built was a final project for Cornell's ORIE5270.
 
 ## Overview
 
-The model takes a single-channel breast ultrasound image and outputs a one-channel segmentation map. The BUSI dataset classes (`benign`, `malignant`, and `normal`) are used as image categories, but the learning task is binary pixel segmentation: tumor mask versus background. Normal images are expected to have empty/no-tumor masks.
+The model takes a breast ultrasound image and outputs a segmentation map. The BUSI dataset classes (`benign`, `malignant`, and `normal`) are used as image categories, but the learning task is binary pixel segmentation: tumor mask versus background. Normal images are expected to have empty/no-tumor masks.
 
-At inference time, raw model logits are converted to probabilities with `sigmoid`. The command-line visualization thresholds predictions at `0.65`; the GUI also uses `0.65` for tumor-pixel counting.
+At inference time, raw model logits are converted to probabilities. The command-line visualization thresholds prediction is set at `0.65`; the GUI also uses `0.65` for tumor-pixel counting.
 
 ## Project Layout
 
@@ -32,8 +32,6 @@ At inference time, raw model logits are converted to probabilities with `sigmoid
 ├── pyproject.toml                     # package metadata and install config
 └── README.md
 ```
-
-Large local artifacts such as user-trained model checkpoints, coverage reports, and Python caches are ignored by git.
 
 ## Architecture
 
@@ -84,7 +82,7 @@ Dataset_BUSI_with_GT/
 └── normal/
 ```
 
-For each image, it looks for a matching `_mask.png` file, skips orphan images and unreadable/shape-mismatched pairs, resizes images and masks to `256 x 256`, normalizes values to `[0, 1]`, and returns `(image, mask)` tensors with shape `(1, 256, 256)` and dtype `float32`. It raises `ValueError` if no valid image-mask pairs are found.
+For each image, it resizes images and masks to `256 x 256`, normalizes values to `[0, 1]`, and returns `(image, mask)` tensors with shape `(1, 256, 256)` and dtype `float32`. It raises `ValueError` if no valid image-mask pairs are found.
 
 Dataset page: <https://scholar.cu.edu.eg/?q=afahmy/pages/dataset>
 
@@ -126,8 +124,6 @@ pip install -e ".[dev,gui]"
 ```
 
 For GPU training, install the PyTorch build that matches your CUDA version before installing this package. See the official PyTorch install selector for the correct command.
-
-If you want the pipeline to download BUSI automatically, configure Kaggle credentials for `kagglehub` first, usually by placing `kaggle.json` at `~/.kaggle/kaggle.json` or by setting `KAGGLE_USERNAME` and `KAGGLE_KEY`.
 
 ## Command-Line Usage
 
